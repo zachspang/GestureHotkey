@@ -1,9 +1,17 @@
 import cv2
 import mediapipe as mp
 import time
+import torch
 from ultralytics import YOLO
 # Load a pretrained YOLO model trained on HaGRID
 gesture_model = YOLO("models\YOLOv10n_gestures.pt")
+
+if (torch.cuda.is_available()):
+    print("CUDA available")
+    gesture_model.to('cuda')
+else:
+    print("CUDA not available")
+
 
 mp_drawing = mp.solutions.drawing_utils
 mp_drawing_styles = mp.solutions.drawing_styles
