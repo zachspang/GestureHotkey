@@ -87,6 +87,9 @@ class Macro:
         save = tk.Button(popup, text="Save", command=lambda: self.save_and_close(popup))
         save.pack(side=tk.RIGHT, anchor="se", padx=5, pady=5)
 
+        #TODO: !!!FIX Once the thread is stopped it cant be restarted, a single listener should be
+        #passed to the init of the object. close_window needs to pause the thread instead of killing it 
+        #https://stackoverflow.com/questions/51911554/how-to-stop-and-start-a-thread-at-will
         self.listener.start()
 
     def save_and_close (self, window: tk.Toplevel):
