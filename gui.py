@@ -31,7 +31,7 @@ def gui_window():
     gesture_icon = tk.Label(binding_frame, image=gesture_img, height=50, width=50)
     gesture_icon.grid(row=1,column=0)
 
-    macro = Macro([])
+    macro = Macro("peace", [])
 
     #TODO: Move record to col 2 and display an edit button in col1
     record_btn = tk.Button(binding_frame, text="Record", command=lambda: macro.open_record_window(root.winfo_x(), root.winfo_y()))
@@ -49,14 +49,15 @@ class Macro:
     recording = []
     last_event_time = 0
 
-    def __init__ (self, initial_macro: list["Event"]):
+    def __init__ (self, name: str, initial_macro: list["Event"]):
         self.saved_macro = initial_macro
+        self.name = name
 
     #Print out all the events that were saved
     def print(self):
         print("\nSaved the following events:")
         for event in self.saved_macro:
-            print(event.key, str(round(event.delay, 2)) + "s", "Pressed" if event.is_pressed() else "Released")
+            print(event.key, str(round(event.delay, 2)) + "s", "Pressed" if event.pressed else "Released")
 
     #Create a popup window at coords x,y
     def open_record_window(self, x, y):
@@ -122,11 +123,28 @@ class Macro:
         
         self.listener.start()
 
-    #Save and close the window
+    #Save recording and close the window
     def save_and_close (self, window: tk.Toplevel):
         self.saved_macro = self.recording
         self.print()
         self.close_window(window)
+
+        #TODO Handle file the isnt formatted correctly
+        try:
+            with open("config.json", 'r') as file:
+                json_data = json.load(file)
+        except FileNotFoundError:
+            json_data = {"Gestures" : {self.name : {"Events" : []}}}
+        
+        new_data = []
+        
+        for event in self.saved_macro:
+            new_data.append({"key" : str(event.key), "delay" : event.delay, "pressed" : event.pressed})
+
+        json_data["Gestures"][self.name]["Events"] = (new_data)
+
+        with open("config.json", 'w') as file:
+            json.dump(json_data, file, indent=4)
 
     #Close the window and stop the keyboard listener thread
     def close_window (self, window: tk.Toplevel):
@@ -144,7 +162,7 @@ class Macro:
 
         for event in self.saved_macro:
             time.sleep(event.delay)
-            if event.is_pressed(): 
+            if event.pressed: 
                 controller.press(event.key)
             else:
                 controller.release(event.key)
@@ -156,6 +174,3 @@ class Event():
         self.key = key
         self.delay = delay
         self.pressed = pressed
-
-    def is_pressed (self):
-        return self.pressed
