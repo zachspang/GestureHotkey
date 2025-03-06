@@ -67,33 +67,40 @@ class Macro:
         
         save = tk.Button(popup, text="Save", command=lambda: self.save_and_close(popup))
         save.pack(side=tk.RIGHT, anchor="se", padx=5, pady=5)
-        save.focus()
-        
+
         #Text box that shows events as they are recorded
         self.event_box = tk.Text(popup, height=6, width=40, state="disabled")
         self.event_box.pack(side=tk.TOP, anchor="n", expand=True, fill="both")
 
+        popup.focus()
         self.record()
 
 
     #Record inputs until save/cancel are pressed
     def record(self):
+        held_keys = set()
+
         #Handle a key being pressed
         def on_press(key):
-            self.event_box.configure(state="normal")
-            self.event_box.insert(tk.END, f"{key} pressed\n")
-            self.event_box.configure(state="disabled")
-            self.event_box.see(tk.END)
+            if key not in held_keys:
+                held_keys.add(key)
 
-            if len(self.recording) == 0:
-                self.recording.append(Event(key, 0, True))
-                self.last_event_time = time.time_ns() / 1000000
-            else:
-                self.recording.append(Event(key, (time.time_ns() / 1000000) - self.last_event_time, True))
-                self.last_event_time = time.time_ns() / 1000000
+                self.event_box.configure(state="normal")
+                self.event_box.insert(tk.END, f"{key} pressed\n")
+                self.event_box.configure(state="disabled")
+                self.event_box.see(tk.END)
+
+                if len(self.recording) == 0:
+                    self.recording.append(Event(key, 0, True))
+                    self.last_event_time = time.time_ns() / 1000000
+                else:
+                    self.recording.append(Event(key, (time.time_ns() / 1000000) - self.last_event_time, True))
+                    self.last_event_time = time.time_ns() / 1000000
 
         #Handle a key being released
         def on_release(key):
+            held_keys.remove(key)
+
             self.event_box.configure(state="normal")
             self.event_box.insert(tk.END, f"{key} released\n")
             self.event_box.configure(state="disabled")
