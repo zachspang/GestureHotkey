@@ -3,6 +3,7 @@ from detection import *
 from pynput import keyboard
 import time
 import json
+import threading
 
 def gui_window():
     root = tk.Tk()
@@ -35,22 +36,27 @@ def gui_window():
     #TODO: Move record to col 2 and display an edit button in col1
     record_btn = tk.Button(binding_frame, text="Record", command=lambda: macro.open_record_window(root.winfo_x(), root.winfo_y()))
     record_btn.grid(row=1,column=1)
+
+    #Temp play button to test macro
+    play_btn = tk.Button(binding_frame, text="Play", command=macro.start_playback)
+    play_btn.grid(row=1,column=2)
+
     #END ROW
     root.mainloop()
 
 class Macro:
-    saved_macro = []
+    saved_macro: list["Event"] = []
     recording = []
     last_event_time = 0
 
-    def __init__ (self, initial_macro: list):
+    def __init__ (self, initial_macro: list["Event"]):
         self.saved_macro = initial_macro
 
     #Print out all the events that were saved
     def print(self):
         print("\nSaved the following events:")
         for event in self.saved_macro:
-            print(event.key, str(round(event.delay, 2)) + "ms", "Pressed" if event.is_pressed() else "Released")
+            print(event.key, str(round(event.delay, 2)) + "s", "Pressed" if event.is_pressed() else "Released")
 
     #Create a popup window at coords x,y
     def open_record_window(self, x, y):
@@ -75,7 +81,6 @@ class Macro:
         popup.focus()
         self.record()
 
-
     #Record inputs until save/cancel are pressed
     def record(self):
         held_keys = set()
@@ -92,10 +97,10 @@ class Macro:
 
                 if len(self.recording) == 0:
                     self.recording.append(Event(key, 0, True))
-                    self.last_event_time = time.time_ns() / 1000000
+                    self.last_event_time = time.time_ns() / 1000000000
                 else:
-                    self.recording.append(Event(key, (time.time_ns() / 1000000) - self.last_event_time, True))
-                    self.last_event_time = time.time_ns() / 1000000
+                    self.recording.append(Event(key, (time.time_ns() / 1000000000) - self.last_event_time, True))
+                    self.last_event_time = time.time_ns() / 1000000000
 
         #Handle a key being released
         def on_release(key):
@@ -106,8 +111,8 @@ class Macro:
             self.event_box.configure(state="disabled")
             self.event_box.see(tk.END)
 
-            self.recording.append(Event(key, (time.time_ns() / 1000000) - self.last_event_time, False))
-            self.last_event_time = time.time_ns() / 1000000
+            self.recording.append(Event(key, (time.time_ns() / 1000000000) - self.last_event_time, False))
+            self.last_event_time = time.time_ns() / 1000000000
 
         self.last_event_time = 0
         self.recording = []
@@ -128,7 +133,23 @@ class Macro:
         window.destroy()
         self.listener.stop()
 
-#A single event, either a key being pressed or released and the about of time in ms since the last event.
+    #Start a thread to call playback
+    def start_playback (self):
+        play_thread = threading.Thread(target=self.playback, daemon=True)
+        play_thread.start()
+
+    #Play the saved macro
+    def playback (self):
+        controller = keyboard.Controller()
+
+        for event in self.saved_macro:
+            time.sleep(event.delay)
+            if event.is_pressed(): 
+                controller.press(event.key)
+            else:
+                controller.release(event.key)
+               
+#A single event, either a key being pressed or released and the about of time in seconds since the last event.
 class Event():
 
     def __init__ (self, key: keyboard.Key, delay:float, pressed:bool):
