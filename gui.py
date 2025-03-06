@@ -7,15 +7,12 @@ import json
 def gui_window():
     root = tk.Tk()
     root.title("GestureHotkey")
-    root.geometry('200x300')
+    root.geometry("200x300")
     
     debug_frame = tk.Frame(root)
     debug_frame.pack(side=tk.BOTTOM, anchor="se", padx=5, pady=5)
 
-    debug_toggle = tk.Checkbutton(debug_frame, text = "Enable Debug", 
-                    height = 2, 
-                    width = 10,
-                    command = toggle_debug) 
+    debug_toggle = tk.Checkbutton(debug_frame, text = "Enable Debug", height = 2, width = 10, command = toggle_debug) 
     debug_toggle.pack()
 
     binding_frame = tk.Frame(root)
@@ -36,7 +33,7 @@ def gui_window():
     macro = Macro([])
 
     #TODO: Move record to col 2 and display an edit button in col1
-    record_btn = tk.Button(binding_frame, text="Record", command=macro.record)
+    record_btn = tk.Button(binding_frame, text="Record", command=lambda: macro.open_record_window(root.winfo_x(), root.winfo_y()))
     record_btn.grid(row=1,column=1)
     #END ROW
     root.mainloop()
@@ -55,26 +52,39 @@ class Macro:
         for event in self.saved_macro:
             print(event.key, str(round(event.delay, 2)) + "ms", "Pressed" if event.is_pressed() else "Released")
 
-    #TODO: Display events as they are recorded so that the users know what they are pressing
-    #Create a popup window and record inputs until save/cancel are pressed
-    def record(self):
+    #Create a popup window at coords x,y
+    def open_record_window(self, x, y):
         #Reset recording and last_event_time incase there was a previous recording
         self.recording = []
         self.last_event_time = 0
 
         popup = tk.Toplevel()
-        popup.wm_title = "Record"
-        popup.geometry("100x150")
+        popup.wm_title = "Record Macro"
+        popup.geometry(f"300x300+{x-20}+{y+20}")
 
         cancel = tk.Button(popup, text="Cancel", command=lambda: self.close_window(popup))
         cancel.pack(side=tk.RIGHT, anchor="se", padx=5, pady=5)
-
+        
         save = tk.Button(popup, text="Save", command=lambda: self.save_and_close(popup))
         save.pack(side=tk.RIGHT, anchor="se", padx=5, pady=5)
+        save.focus()
+        
+        #Text box that shows events as they are recorded
+        self.event_box = tk.Text(popup, height=6, width=40, state="disabled")
+        self.event_box.pack(side=tk.TOP, anchor="n", expand=True, fill="both")
 
+        self.record()
+
+
+    #Record inputs until save/cancel are pressed
+    def record(self):
         #Handle a key being pressed
         def on_press(key):
-            print('{0} pressed'.format(key))
+            self.event_box.configure(state="normal")
+            self.event_box.insert(tk.END, f"{key} pressed\n")
+            self.event_box.configure(state="disabled")
+            self.event_box.see(tk.END)
+
             if len(self.recording) == 0:
                 self.recording.append(Event(key, 0, True))
                 self.last_event_time = time.time_ns() / 1000000
@@ -84,7 +94,11 @@ class Macro:
 
         #Handle a key being released
         def on_release(key):
-            print('{0} released'.format(key))
+            self.event_box.configure(state="normal")
+            self.event_box.insert(tk.END, f"{key} released\n")
+            self.event_box.configure(state="disabled")
+            self.event_box.see(tk.END)
+
             self.recording.append(Event(key, (time.time_ns() / 1000000) - self.last_event_time, False))
             self.last_event_time = time.time_ns() / 1000000
 
