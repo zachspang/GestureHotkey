@@ -42,7 +42,6 @@ def gui_window():
     root.mainloop()
 
 class Macro:
-
     saved_macro = []
     recording = []
     last_event_time = 0
@@ -52,12 +51,17 @@ class Macro:
 
     #Print out all the events that were saved
     def print(self):
+        print("\nSaved the following events:")
         for event in self.saved_macro:
-            print(event.key, event.delay, event.is_pressed())
+            print(event.key, str(round(event.delay, 2)) + "ms", "Pressed" if event.is_pressed() else "Released")
 
     #TODO: Display events as they are recorded so that the users know what they are pressing
     #Create a popup window and record inputs until save/cancel are pressed
     def record(self):
+        #Reset recording and last_event_time incase there was a previous recording
+        self.recording = []
+        self.last_event_time = 0
+
         popup = tk.Toplevel()
         popup.wm_title = "Record"
         popup.geometry("100x150")
@@ -68,7 +72,7 @@ class Macro:
         save = tk.Button(popup, text="Save", command=lambda: self.save_and_close(popup))
         save.pack(side=tk.RIGHT, anchor="se", padx=5, pady=5)
 
-        #These functions are used by the listener when key is pressed/released
+        #Handle a key being pressed
         def on_press(key):
             print('{0} pressed'.format(key))
             if len(self.recording) == 0:
@@ -78,6 +82,7 @@ class Macro:
                 self.recording.append(Event(key, (time.time_ns() / 1000000) - self.last_event_time, True))
                 self.last_event_time = time.time_ns() / 1000000
 
+        #Handle a key being released
         def on_release(key):
             print('{0} released'.format(key))
             self.recording.append(Event(key, (time.time_ns() / 1000000) - self.last_event_time, False))
@@ -85,17 +90,19 @@ class Macro:
 
         self.last_event_time = 0
         self.recording = []
-        
         self.listener = keyboard.Listener(
             on_press=on_press,
             on_release=on_release)
+        
         self.listener.start()
 
+    #Save and close the window
     def save_and_close (self, window: tk.Toplevel):
         self.saved_macro = self.recording
         self.print()
         self.close_window(window)
 
+    #Close the window and stop the keyboard listener thread
     def close_window (self, window: tk.Toplevel):
         window.destroy()
         self.listener.stop()
