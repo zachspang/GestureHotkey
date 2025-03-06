@@ -50,25 +50,6 @@ class Macro:
     def __init__ (self, initial_macro: list):
         self.saved_macro = initial_macro
 
-        #These functions are used by the listener when key is pressed/released
-        def on_press(key):
-            print('{0} pressed'.format(key))
-            if len(self.recording) == 0:
-                self.recording.append(Event(key, 0, True))
-                self.last_event_time = time.time_ns() / 1000000
-            else:
-                self.recording.append(Event(key, (time.time_ns() / 1000000) - self.last_event_time, True))
-                self.last_event_time = time.time_ns() / 1000000
-
-        def on_release(key):
-            print('{0} released'.format(key))
-            self.recording.append(Event(key, (time.time_ns() / 1000000) - self.last_event_time, False))
-            self.last_event_time = time.time_ns() / 1000000
-
-        self.listener = keyboard.Listener(
-            on_press=on_press,
-            on_release=on_release)
-    
     #Print out all the events that were saved
     def print(self):
         for event in self.saved_macro:
@@ -87,9 +68,27 @@ class Macro:
         save = tk.Button(popup, text="Save", command=lambda: self.save_and_close(popup))
         save.pack(side=tk.RIGHT, anchor="se", padx=5, pady=5)
 
-        #TODO: !!!FIX Once the thread is stopped it cant be restarted, a single listener should be
-        #passed to the init of the object. close_window needs to pause the thread instead of killing it 
-        #https://stackoverflow.com/questions/51911554/how-to-stop-and-start-a-thread-at-will
+        #These functions are used by the listener when key is pressed/released
+        def on_press(key):
+            print('{0} pressed'.format(key))
+            if len(self.recording) == 0:
+                self.recording.append(Event(key, 0, True))
+                self.last_event_time = time.time_ns() / 1000000
+            else:
+                self.recording.append(Event(key, (time.time_ns() / 1000000) - self.last_event_time, True))
+                self.last_event_time = time.time_ns() / 1000000
+
+        def on_release(key):
+            print('{0} released'.format(key))
+            self.recording.append(Event(key, (time.time_ns() / 1000000) - self.last_event_time, False))
+            self.last_event_time = time.time_ns() / 1000000
+
+        self.last_event_time = 0
+        self.recording = []
+        
+        self.listener = keyboard.Listener(
+            on_press=on_press,
+            on_release=on_release)
         self.listener.start()
 
     def save_and_close (self, window: tk.Toplevel):
