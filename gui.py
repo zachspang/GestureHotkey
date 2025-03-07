@@ -31,23 +31,33 @@ def gui_window():
     gesture_icon = tk.Label(binding_frame, image=gesture_img, height=50, width=50)
     gesture_icon.grid(row=1,column=0)
 
-    macro = Macro("peace")
+    macro_list = [Macro("peace")]
 
     #TODO: Move record to col 2 and display an edit button in col1
-    record_btn = tk.Button(binding_frame, text="Record", command=lambda: macro.open_record_window(root.winfo_x(), root.winfo_y()))
+    record_btn = tk.Button(binding_frame, text="Record", command=lambda: macro_list[0].open_record_window(root.winfo_x(), root.winfo_y()))
     record_btn.grid(row=1,column=1)
 
-    #Temp play button to test macro
-    play_btn = tk.Button(binding_frame, text="Play", command=macro.start_playback)
-    play_btn.grid(row=1,column=2)
-
     #END ROW
+
+    #Every 30ms get an updated list of detections
+    def check_detections():
+        detections = get_detections()
+        for detection in detections:
+            for macro in macro_list:
+                if detection["name"] == macro.name:
+                    if detection["confidence"] > 0.8 and not macro.active:
+                        macro.start_playback()
+                    
+        root.after(30, check_detections)
+
+    check_detections()
     root.mainloop()
 
 class Macro:
     saved_macro: list["Event"] = []
     recording = []
     last_event_time = 0
+    active = False
 
     def __init__ (self, name: str):
         self.name = name
@@ -175,6 +185,7 @@ class Macro:
 
     #Play the saved macro
     def playback (self):
+        self.active = True
         controller = keyboard.Controller()
 
         for event in self.saved_macro:
@@ -183,6 +194,8 @@ class Macro:
                 controller.press(event.key)
             else:
                 controller.release(event.key)
+        
+        self.active = False
                
 #A single event, either a key being pressed or released and the about of time in seconds since the last event.
 class Event():
