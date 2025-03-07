@@ -42,24 +42,24 @@ def detection_window ():
             #If there are hands in the frame
             if mediapipe_results.multi_hand_landmarks:
                 gesture_result = gesture_model(image, verbose=False)[0]
-                image = gesture_result.plot()
-
-                #Uncomment to draw hand landmarks
-                # for hand_landmarks in mediapipe_results.multi_hand_landmarks:
-                #     mp_drawing.draw_landmarks(
-                #     image,
-                #     hand_landmarks,
-                #     mp_hands.HAND_CONNECTIONS,
-                #     mp_drawing_styles.get_default_hand_landmarks_style(),
-                #     mp_drawing_styles.get_default_hand_connections_style())
-            cv2.putText(image, ("FPS: " + str(round((1.0 / (time.time() - frame_start_time)), 2))), (0,40), cv2.FONT_HERSHEY_SIMPLEX , 1, (0, 0, 255), 1, cv2.LINE_8)
+                if debug:
+                    image = gesture_result.plot()
+                    #Uncomment to draw hand landmarks
+                    # for hand_landmarks in mediapipe_results.multi_hand_landmarks:
+                    #     mp_drawing.draw_landmarks(
+                    #     image,
+                    #     hand_landmarks,
+                    #     mp_hands.HAND_CONNECTIONS,
+                    #     mp_drawing_styles.get_default_hand_landmarks_style(),
+                    #     mp_drawing_styles.get_default_hand_connections_style())
 
             if debug:
+                cv2.putText(image, ("FPS: " + str(round((1.0 / (time.time() - frame_start_time)), 2))), (0,40), cv2.FONT_HERSHEY_SIMPLEX , 1, (0, 0, 255), 1, cv2.LINE_8)
                 cv2.imshow('Gesture Hotkey Debug', image)
             else:
                 cv2.destroyAllWindows()
 
-            if cv2.waitKey(5) & 0xFF == 27:
+            if cv2.waitKey(1) & 0xFF == 27:
                 break
     cap.release()
     cv2.destroyAllWindows()
