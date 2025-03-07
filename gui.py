@@ -31,7 +31,7 @@ def gui_window():
     gesture_icon = tk.Label(binding_frame, image=gesture_img, height=50, width=50)
     gesture_icon.grid(row=1,column=0)
 
-    macro = Macro("peace", [])
+    macro = Macro("peace")
 
     #TODO: Move record to col 2 and display an edit button in col1
     record_btn = tk.Button(binding_frame, text="Record", command=lambda: macro.open_record_window(root.winfo_x(), root.winfo_y()))
@@ -49,8 +49,7 @@ class Macro:
     recording = []
     last_event_time = 0
 
-    def __init__ (self, name: str, initial_macro: list["Event"]):
-        self.saved_macro = initial_macro
+    def __init__ (self, name: str):
         self.name = name
         self.load_save()
 
