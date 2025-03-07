@@ -52,6 +52,7 @@ class Macro:
     def __init__ (self, name: str, initial_macro: list["Event"]):
         self.saved_macro = initial_macro
         self.name = name
+        self.load_save()
 
     #Print out all the events that were saved
     def print(self):
@@ -123,13 +124,27 @@ class Macro:
         
         self.listener.start()
 
+    def load_save (self):
+        #TODO Handle file that isnt formatted correctly
+        try:
+            with open("config.json", 'r') as file:
+                json_data = json.load(file)["Gestures"][self.name]["Events"]
+        except FileNotFoundError:
+            json_data = []
+        
+        for event in json_data:
+            try:
+                self.saved_macro.append(Event(keyboard.HotKey.parse(event["key"])[0], event["delay"], event["pressed"]))
+            except ValueError: 
+                self.saved_macro.append(Event(keyboard.HotKey.parse(f"<{event['key']}>")[0], event["delay"], event["pressed"]))
+
     #Save recording and close the window
     def save_and_close (self, window: tk.Toplevel):
         self.saved_macro = self.recording
         self.print()
         self.close_window(window)
 
-        #TODO Handle file the isnt formatted correctly
+        #TODO Handle file that isnt formatted correctly
         try:
             with open("config.json", 'r') as file:
                 json_data = json.load(file)
@@ -139,7 +154,10 @@ class Macro:
         new_data = []
         
         for event in self.saved_macro:
-            new_data.append({"key" : str(event.key), "delay" : event.delay, "pressed" : event.pressed})
+            try:
+                new_data.append({"key" : event.key.char, "delay" : event.delay, "pressed" : event.pressed})
+            except AttributeError:
+                new_data.append({"key" : str(event.key)[4:], "delay" : event.delay, "pressed" : event.pressed})
 
         json_data["Gestures"][self.name]["Events"] = (new_data)
 
@@ -170,7 +188,7 @@ class Macro:
 #A single event, either a key being pressed or released and the about of time in seconds since the last event.
 class Event():
 
-    def __init__ (self, key: keyboard.Key, delay:float, pressed:bool):
+    def __init__ (self, key: keyboard.Key, delay: float, pressed: bool):
         self.key = key
         self.delay = delay
         self.pressed = pressed
