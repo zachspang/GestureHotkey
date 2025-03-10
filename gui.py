@@ -129,7 +129,8 @@ class Macro:
         self.recording = []
         self.listener = keyboard.Listener(
             on_press=on_press,
-            on_release=on_release)
+            on_release=on_release,
+            suppress=True)
         
         self.listener.start()
 
