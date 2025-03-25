@@ -5,33 +5,105 @@ import time
 import json
 import threading
 
+current_profile:tk.IntVar
+
 def gui_window():
     root = tk.Tk()
     root.title("GestureHotkey")
     root.geometry("200x300")
+
+    menubar = tk.Menu()
+
+    profiles = tk.Menu(menubar, tearoff = False)
+    menubar.add_cascade(label = "Profiles", menu = profiles)
+
+    profile_select = tk.Menu(menubar, tearoff=False)
+
+    #TODO: Need to update loaded_profiles when the config changes
+    #TODO: URGENT, need to handle missing config file
+    global current_profile 
+    current_profile = tk.IntVar()
+    current_profile_name = tk.StringVar()
+    loaded_profiles = {}
+    macro_list = []
+
+    #Reloads the macro_list with the settings from the new profile and changes the default profile
+    def profile_changed():
+        global macro_list
+        macro_list = [Macro("peace")]
+        current_profile_name.set(f"Profile: {loaded_profiles[str(current_profile.get())]['Name']}")
+        try:
+            with open("config.json", 'r') as file:
+                json_data = json.load(file)
+        except FileNotFoundError:
+            json_data = {}
+
+        json_data["default_profile"] = current_profile.get()
+
+        with open("config.json", 'w') as file:
+            json.dump(json_data, file, indent=4)
+        root.update_idletasks()
+
+    try:
+        with open("config.json", 'r') as file:
+            json_load = json.load(file)
+            loaded_profiles = json_load["Profiles"]
+            current_profile.set(json_load["default_profile"])
+            current_profile_name.set(f"Profile: {loaded_profiles[str(current_profile.get())]['Name']}")
+            macro_list = [Macro("peace")]
+    except FileNotFoundError:
+        profile_select.add_radiobutton(    
+          label="Default",
+            variable=current_profile,
+            value=0,
+            command=profile_changed
+        )
+
+    for profile in loaded_profiles.keys():
+        profile_select.add_radiobutton(    
+            label=loaded_profiles[profile]["Name"],
+            variable=current_profile,
+            value=profile,
+            command=profile_changed
+        )
     
+    profiles.add_cascade(label = "Change Profile", menu = profile_select)
+    profiles.add_command(label = "Edit Profile Name")
+    profiles.add_command(label = "Create New Profile")
+    profiles.add_command(label = "Import Profile")
+    profiles.add_command(label = "Export Profile")
+    profiles.add_command(label = "Delete Profile")
+
+    settings = tk.Menu(menubar, tearoff = False)
+    menubar.add_cascade(label = "Settings", menu = settings)
+    settings.add_command(label = "Preferences", command = None)
+    settings.add_checkbutton(label = "Run at Startup", command= None)
+
+    root.config(menu = menubar)
+
     debug_frame = tk.Frame(root)
     debug_frame.pack(side=tk.BOTTOM, anchor="se", padx=5, pady=5)
 
     debug_toggle = tk.Checkbutton(debug_frame, text = "Enable Debug", height = 2, width = 10, command = toggle_debug) 
     debug_toggle.pack()
 
+    profile_label = tk.Label(root, textvariable = current_profile_name)
+    profile_label.pack(side=tk.TOP, anchor="nw", padx=10, pady=2)
+   
     binding_frame = tk.Frame(root)
-    binding_frame.pack(side=tk.LEFT, anchor="nw", padx=5, pady=5)
+    binding_frame.pack(side=tk.TOP, anchor="nw", padx=5, pady=0)
 
     gesture_label = tk.Label(binding_frame, text="Gesture", font="Helvetica 10 bold")
-    gesture_label.grid(row=0,column=0, padx=5,pady=10)
+    gesture_label.grid(row=0,column=0, padx=5,pady=0)
 
     macro_label = tk.Label(binding_frame, text="Macro", font="Helvetica 10 bold")
-    macro_label.grid(row=0,column=1, padx=5,pady=10)
+    macro_label.grid(row=0,column=1, padx=5,pady=0)
 
     #TODO: remake this to make each row instead of just one.
     #Probably pass the binding frame to a function that loops a list of gestures to create the rows and check if they have saves
     gesture_img = tk.PhotoImage(file="./icons/peace.png").subsample(4,4)
     gesture_icon = tk.Label(binding_frame, image=gesture_img, height=50, width=50)
     gesture_icon.grid(row=1,column=0)
-
-    macro_list = [Macro("peace")]
 
     #TODO: Move record to col 2 and display an edit button in col1
     record_btn = tk.Button(binding_frame, text="Record", command=lambda: macro_list[0].open_record_window(root.winfo_x(), root.winfo_y()))
@@ -138,9 +210,11 @@ class Macro:
         #TODO Handle file that isnt formatted correctly
         try:
             with open("config.json", 'r') as file:
-                json_data = json.load(file)["Gestures"][self.name]["Events"]
-        except FileNotFoundError:
-            json_data = []
+                json_data = json.load(file)["Profiles"][f"{current_profile.get()}"]["Gestures"][self.name]["Events"]
+                print("Loaded Config")
+        except FileNotFoundError or KeyError:
+            saved_macro = []
+            return
         
         for event in json_data:
             try:
@@ -159,7 +233,7 @@ class Macro:
             with open("config.json", 'r') as file:
                 json_data = json.load(file)
         except FileNotFoundError:
-            json_data = {"Gestures" : {self.name : {"Events" : []}}}
+            json_data = {"default_profile":0,"Profiles":{"0":{"Name":"Default", "Gestures":{self.name:{"Events":[]}}}}}
         
         new_data = []
         
@@ -169,7 +243,10 @@ class Macro:
             except AttributeError:
                 new_data.append({"key" : str(event.key)[4:], "delay" : event.delay, "pressed" : event.pressed})
 
-        json_data["Gestures"][self.name]["Events"] = (new_data)
+        try:
+            json_data["Profiles"][f"{current_profile.get()}"]["Gestures"][self.name]["Events"] = new_data
+        except KeyError:
+            json_data["Profiles"][f"{current_profile.get()}"] = {"Name":"Default", "Gestures":{self.name:{"Events":new_data}}}
 
         with open("config.json", 'w') as file:
             json.dump(json_data, file, indent=4)
