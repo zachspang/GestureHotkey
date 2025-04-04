@@ -20,24 +20,28 @@ def gui_window():
     profile_select = tk.Menu(menubar, tearoff=False)
 
     #TODO: Need to update loaded_profiles when the config changes
-    #TODO: URGENT, need to handle missing config file
     global current_profile 
     current_profile = tk.IntVar()
     current_profile_name = tk.StringVar()
     loaded_profiles = {}
+    #TODO: Macro list needs to be initialized with a list of all gestures
     macro_list = [Macro("peace")]
 
     #Reloads the macro_list with the settings from the new profile and changes the default profile
     def profile_changed():
-        global macro_list
-        macro_list = [Macro("peace")]
+        nonlocal loaded_profiles
+        nonlocal macro_list
+
         current_profile_name.set(f"Profile: {loaded_profiles[str(current_profile.get())]['Name']}")
+
         try:
             with open("config.json", 'r') as file:
                 json_data = json.load(file)
         except FileNotFoundError:
             json_data = {}
 
+        macro_list = [Macro("peace")]
+        loaded_profiles = json_data["Profiles"]
         json_data["default_profile"] = current_profile.get()
 
         with open("config.json", 'w') as file:
@@ -46,9 +50,10 @@ def gui_window():
 
     try:
         with open("config.json", 'r') as file:
-            json_load = json.load(file)
-            loaded_profiles = json_load["Profiles"]
-            current_profile.set(json_load["default_profile"])
+            json_data = json.load(file)
+            macro_list = [Macro("peace")]
+            loaded_profiles = json_data["Profiles"]
+            current_profile.set(json_data["default_profile"])
             current_profile_name.set(f"Profile: {loaded_profiles[str(current_profile.get())]['Name']}")
             
     except FileNotFoundError:
@@ -138,6 +143,7 @@ class Macro:
     last_event_time = 0
     active = False
 
+    #TODO: Instead of opening the file for each gesture this should read from a global variable loaded_profiles that holds the current config profiles
     def __init__ (self, name: str):
         self.name = name
         self.load_save()
@@ -215,14 +221,14 @@ class Macro:
 
     def load_save (self):
         #TODO Handle file that isnt formatted correctly
+        self.saved_macro = []
         try:
             with open("config.json", 'r') as file:
                 json_data = json.load(file)["Profiles"][f"{current_profile.get()}"]["Gestures"][self.name]["Events"]
                 print("Loaded Config")
         except FileNotFoundError or KeyError:
-            saved_macro = []
             return
-        
+      
         for event in json_data:
             try:
                 self.saved_macro.append(Event(keyboard.HotKey.parse(event["key"])[0], event["delay"], event["pressed"]))
