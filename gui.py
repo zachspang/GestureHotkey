@@ -25,7 +25,7 @@ def gui_window():
     current_profile = tk.IntVar()
     current_profile_name = tk.StringVar()
     loaded_profiles = {}
-    macro_list = []
+    macro_list = [Macro("peace")]
 
     #Reloads the macro_list with the settings from the new profile and changes the default profile
     def profile_changed():
@@ -50,8 +50,15 @@ def gui_window():
             loaded_profiles = json_load["Profiles"]
             current_profile.set(json_load["default_profile"])
             current_profile_name.set(f"Profile: {loaded_profiles[str(current_profile.get())]['Name']}")
-            macro_list = [Macro("peace")]
+            
     except FileNotFoundError:
+        json_data = {"default_profile":0,"Profiles":{"0":{"Name":"Default", "Gestures":{}}}}
+        for gesture in macro_list:
+            json_data["Profiles"]["0"]["Gestures"][gesture.name] = {}
+            json_data["Profiles"]["0"]["Gestures"][gesture.name]["Events"] = []
+        with open("config.json", 'w') as file:
+            json.dump(json_data, file, indent=4)
+
         profile_select.add_radiobutton(    
           label="Default",
             variable=current_profile,
