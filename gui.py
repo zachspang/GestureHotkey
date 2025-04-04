@@ -19,13 +19,12 @@ def gui_window():
 
     profile_select = tk.Menu(menubar, tearoff=False)
 
-    #TODO: Need to update loaded_profiles when the config changes
     global current_profile 
     current_profile = tk.IntVar()
     current_profile_name = tk.StringVar()
     loaded_profiles = {}
-    #TODO: Macro list needs to be initialized with a list of all gestures
-    macro_list = [Macro("peace")]
+    #TODO: Macro list needs to be initialized with a list of all gestures whenever a profile is loaded
+    macro_list = []
 
     #Reloads the macro_list with the settings from the new profile and changes the default profile
     def profile_changed():
@@ -46,15 +45,18 @@ def gui_window():
 
         with open("config.json", 'w') as file:
             json.dump(json_data, file, indent=4)
+        
+        print(f"Loaded {current_profile_name.get()}")
         root.update_idletasks()
 
     try:
         with open("config.json", 'r') as file:
             json_data = json.load(file)
-            macro_list = [Macro("peace")]
             loaded_profiles = json_data["Profiles"]
             current_profile.set(json_data["default_profile"])
             current_profile_name.set(f"Profile: {loaded_profiles[str(current_profile.get())]['Name']}")
+            macro_list = [Macro("peace")]
+            print(f"Loaded {current_profile_name.get()}")
             
     except FileNotFoundError:
         json_data = {"default_profile":0,"Profiles":{"0":{"Name":"Default", "Gestures":{}}}}
@@ -224,12 +226,12 @@ class Macro:
         self.saved_macro = []
         try:
             with open("config.json", 'r') as file:
-                json_data = json.load(file)["Profiles"][f"{current_profile.get()}"]["Gestures"][self.name]["Events"]
-                print("Loaded Config")
+                json_data = json.load(file)
+                events = json_data["Profiles"][f"{current_profile.get()}"]["Gestures"][self.name]["Events"]
         except FileNotFoundError or KeyError:
             return
       
-        for event in json_data:
+        for event in events:
             try:
                 self.saved_macro.append(Event(keyboard.HotKey.parse(event["key"])[0], event["delay"], event["pressed"]))
             except ValueError: 
