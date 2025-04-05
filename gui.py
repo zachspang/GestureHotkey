@@ -125,7 +125,7 @@ def gui_window():
 
     #END ROW
 
-    #Every 30ms get an updated list of detections
+    #Every 16ms get an updated list of detections
     def check_detections():
         detections = get_detections()
         for detection in detections:
@@ -134,7 +134,7 @@ def gui_window():
                     if detection["confidence"] > 0.8 and not macro.active:
                         macro.start_playback()
                     
-        root.after(30, check_detections)
+        root.after(16, check_detections)
 
     check_detections()
     root.mainloop()
