@@ -61,7 +61,7 @@ def gui_window():
 
     profiles.add_cascade(label = "Change Profile", menu = profile_select)
     profiles.add_command(label = "Edit Profile Name", command=lambda: edit_profile_name(root.winfo_x(), root.winfo_y()))
-    profiles.add_command(label = "Create New Profile")
+    profiles.add_command(label = "Create New Profile", command=create_profile)
     profiles.add_command(label = "Import Profile")
     profiles.add_command(label = "Export Profile")
     profiles.add_command(label = "Delete Profile")
@@ -204,6 +204,29 @@ def edit_profile_name(x,y):
 
     popup.focus()
 
+
+def create_profile():
+    global loaded_profiles
+    new_index = str(int(max(loaded_profiles.keys())) + 1)
+    new_profile = {"Name":f"Profile {new_index}", "Gestures":{}}
+
+    for gesture in gesture_list:
+        new_profile["Gestures"][gesture] = {}
+        new_profile["Gestures"][gesture]["Events"] = []
+
+    loaded_profiles[new_index] = new_profile
+    save_profiles()
+
+    profile_select.add_radiobutton(    
+        label=f"Profile {new_index}",
+        variable=current_profile,
+        value=new_index,
+        command=profile_changed
+    )
+
+    current_profile.set(new_index)
+    profile_changed()
+
 class Macro:
     saved_macro: list["Event"] = []
     recording = []
@@ -289,7 +312,7 @@ class Macro:
     def load_save (self):
         self.saved_macro = []
         events = loaded_profiles[str(current_profile.get())]["Gestures"][self.name]["Events"]
-        
+
         for event in events:
             try:
                 self.saved_macro.append(Event(keyboard.HotKey.parse(event["key"])[0], event["delay"], event["pressed"]))
