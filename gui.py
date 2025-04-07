@@ -6,6 +6,7 @@ import json
 import threading
 
 current_profile:tk.IntVar
+gesture_list = ["peace"]
 
 def gui_window():
     root = tk.Tk()
@@ -23,7 +24,6 @@ def gui_window():
     current_profile = tk.IntVar()
     current_profile_label = tk.StringVar()
     loaded_profiles = {}
-    #TODO: Macro list needs to be initialized with a list of all gestures whenever a profile is loaded
     macro_list = []
 
     #Reloads the macro_list with the settings from the new profile and changes the default profile
@@ -39,7 +39,7 @@ def gui_window():
         except FileNotFoundError:
             json_data = {}
 
-        macro_list = [Macro("peace")]
+        macro_list = [Macro(gesture) for gesture in gesture_list]
         loaded_profiles = json_data["Profiles"]
         json_data["default_profile"] = current_profile.get()
 
@@ -67,16 +67,20 @@ def gui_window():
             loaded_profiles = json_data["Profiles"]
             current_profile.set(json_data["default_profile"])
             current_profile_label.set(f"Profile: {loaded_profiles[str(current_profile.get())]['Name']}")
-            macro_list = [Macro("peace")]
+            macro_list = [Macro(gesture) for gesture in gesture_list]
             print(f"Loaded {current_profile_label.get()}")
             
     except FileNotFoundError:
         json_data = {"default_profile":0,"Profiles":{"0":{"Name":"Default", "Gestures":{}}}}
-        for gesture in macro_list:
-            json_data["Profiles"]["0"]["Gestures"][gesture.name] = {}
-            json_data["Profiles"]["0"]["Gestures"][gesture.name]["Events"] = []
+        for gesture in gesture_list:
+            json_data["Profiles"]["0"]["Gestures"][gesture] = {}
+            json_data["Profiles"]["0"]["Gestures"][gesture]["Events"] = []
         with open("config.json", 'w') as file:
             json.dump(json_data, file, indent=4)
+
+        loaded_profiles = json_data["Profiles"]
+        current_profile.set(json_data["default_profile"])
+        current_profile_label.set(f"Profile: {loaded_profiles[str(current_profile.get())]['Name']}")
 
         profile_select.add_radiobutton(    
           label="Default",
@@ -140,7 +144,16 @@ def gui_window():
 
     profiles.add_command(label = "Edit Profile Name", command=lambda: edit_profile_name(root.winfo_x(), root.winfo_y()))
 
+    def create_new_profile():
+        '''
+        make new profile
+        updated loaded_profiles
+        call save_profiles
+        '''
+
+
     profiles.add_command(label = "Create New Profile")
+
     profiles.add_command(label = "Import Profile")
     profiles.add_command(label = "Export Profile")
     profiles.add_command(label = "Delete Profile")
