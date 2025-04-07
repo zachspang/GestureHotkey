@@ -5,11 +5,16 @@ import time
 import json
 import threading
 
-current_profile:tk.IntVar
 gesture_list = ["peace"]
+root = tk.Tk()
+current_profile = tk.IntVar()
+current_profile_label = tk.StringVar()
+profile_select:tk.Menu
+loaded_profiles = {}
+macro_list = []
 
 def gui_window():
-    root = tk.Tk()
+    global root
     root.title("GestureHotkey")
     root.geometry("200x300")
 
@@ -18,48 +23,11 @@ def gui_window():
     profiles = tk.Menu(menubar, tearoff = False)
     menubar.add_cascade(label = "Profiles", menu = profiles)
 
+    global profile_select
     profile_select = tk.Menu(menubar, tearoff=False)
 
-    global current_profile 
-    current_profile = tk.IntVar()
-    current_profile_label = tk.StringVar()
-    loaded_profiles = {}
-    macro_list = []
-
-    #Reloads the macro_list with the settings from the new profile and changes the default profile
-    def profile_changed():
-        nonlocal loaded_profiles
-        nonlocal macro_list
-
-        current_profile_label.set(f"Profile: {loaded_profiles[str(current_profile.get())]['Name']}")
-
-        try:
-            with open("config.json", 'r') as file:
-                json_data = json.load(file)
-        except FileNotFoundError:
-            json_data = {}
-
-        macro_list = [Macro(gesture) for gesture in gesture_list]
-        loaded_profiles = json_data["Profiles"]
-        json_data["default_profile"] = current_profile.get()
-
-        with open("config.json", 'w') as file:
-            json.dump(json_data, file, indent=4)
-        
-        print(f"Loaded {current_profile_label.get()}")
-        root.update_idletasks()
-
-    def save_profiles():
-        try:
-            with open("config.json", 'r') as file:
-                json_data = json.load(file)
-        except FileNotFoundError:
-            json_data = {}
-
-        json_data["Profiles"] = loaded_profiles
-
-        with open("config.json", 'w') as file:
-            json.dump(json_data, file, indent=4)
+    global loaded_profiles
+    global macro_list
 
     try:
         with open("config.json", 'r') as file:
@@ -89,71 +57,11 @@ def gui_window():
             command=profile_changed
         )
 
-    def load_profile_radiobuttons():
-        profile_select.delete(0, 'end')
-
-        for profile in loaded_profiles.keys():
-            profile_select.add_radiobutton(    
-                label=loaded_profiles[profile]["Name"],
-                variable=current_profile,
-                value=profile,
-                command=profile_changed
-            )
-
     load_profile_radiobuttons()
 
     profiles.add_cascade(label = "Change Profile", menu = profile_select)
-
-    def edit_profile_name(x,y):
-        popup = tk.Toplevel()
-        popup.wm_title = "Edit Profile Name"
-        popup.geometry(f"200x80+{x-20}+{y+20}")
-        
-        text_frame = tk.Frame(popup)
-        text_frame.pack(side = "top", fill = "x")
-
-        label = tk.Label(text_frame, text="Profile Name: ")
-        label.pack(side = "left")
-
-        text_entry = tk.Entry(text_frame, bd = 5)
-        text_entry.pack(side = "right")
-
-        button_frame = tk.Frame(popup)
-        button_frame.pack(side = "bottom", fill = "x")
-
-        cancel = tk.Button(button_frame, text="Cancel", command=popup.destroy)
-        cancel.pack(side="right", anchor="se", padx=5, pady=5)
-
-        def save_profile_name():
-            new_name = text_entry.get()
-            if new_name == "":
-                popup.destroy()
-                return
-
-            loaded_profiles[str(current_profile.get())]['Name'] = new_name
-            save_profiles()
-            load_profile_radiobuttons()
-            current_profile_label.set("Profile: " + new_name)
-
-            popup.destroy()
-
-        save = tk.Button(button_frame, text="Save", command=save_profile_name)
-        save.pack(side="right", anchor="se", padx=5, pady=5)
-
-        popup.focus()
-
     profiles.add_command(label = "Edit Profile Name", command=lambda: edit_profile_name(root.winfo_x(), root.winfo_y()))
-
-    def create_new_profile():
-        '''
-        make new profile
-        updated loaded_profiles
-        call save_profiles
-        '''
-
-
     profiles.add_command(label = "Create New Profile")
-
     profiles.add_command(label = "Import Profile")
     profiles.add_command(label = "Export Profile")
     profiles.add_command(label = "Delete Profile")
@@ -208,6 +116,93 @@ def gui_window():
 
     check_detections()
     root.mainloop()
+
+#Reloads the macro_list with the settings from the new profile and changes the default profile
+def profile_changed():
+    global loaded_profiles
+    global macro_list
+
+    current_profile_label.set(f"Profile: {loaded_profiles[str(current_profile.get())]['Name']}")
+
+    try:
+        with open("config.json", 'r') as file:
+            json_data = json.load(file)
+    except FileNotFoundError:
+        json_data = {}
+
+    macro_list = [Macro(gesture) for gesture in gesture_list]
+    loaded_profiles = json_data["Profiles"]
+    json_data["default_profile"] = current_profile.get()
+
+    with open("config.json", 'w') as file:
+        json.dump(json_data, file, indent=4)
+    
+    print(f"Loaded {current_profile_label.get()}")
+    root.update_idletasks()
+
+#Refreshes the profiles available in the profile select menu
+def load_profile_radiobuttons():
+    profile_select.delete(0, 'end')
+
+    for profile in loaded_profiles.keys():
+        profile_select.add_radiobutton(    
+            label=loaded_profiles[profile]["Name"],
+            variable=current_profile,
+            value=profile,
+            command=profile_changed
+        )
+
+#Writes loaded_profiles to config
+def save_profiles():
+    try:
+        with open("config.json", 'r') as file:
+            json_data = json.load(file)
+    except FileNotFoundError:
+        json_data = {}
+
+    json_data["Profiles"] = loaded_profiles
+
+    with open("config.json", 'w') as file:
+        json.dump(json_data, file, indent=4)
+
+#Pops out a window where a user can change the name of a profile
+def edit_profile_name(x,y):
+    popup = tk.Toplevel()
+    popup.wm_title = "Edit Profile Name"
+    popup.geometry(f"200x80+{x-20}+{y+20}")
+    
+    text_frame = tk.Frame(popup)
+    text_frame.pack(side = "top", fill = "x")
+
+    label = tk.Label(text_frame, text="Profile Name: ")
+    label.pack(side = "left")
+
+    text_entry = tk.Entry(text_frame, bd = 5)
+    text_entry.pack(side = "right")
+
+    button_frame = tk.Frame(popup)
+    button_frame.pack(side = "bottom", fill = "x")
+
+    cancel = tk.Button(button_frame, text="Cancel", command=popup.destroy)
+    cancel.pack(side="right", anchor="se", padx=5, pady=5)
+
+    def save_profile_name():
+        new_name = text_entry.get()
+        if new_name == "":
+            popup.destroy()
+            return
+
+        loaded_profiles[str(current_profile.get())]['Name'] = new_name
+        save_profiles()
+        load_profile_radiobuttons()
+        current_profile_label.set("Profile: " + new_name)
+
+        popup.destroy()
+
+    save = tk.Button(button_frame, text="Save", command=save_profile_name)
+    save.pack(side="right", anchor="se", padx=5, pady=5)
+
+    popup.focus()
 
 class Macro:
     saved_macro: list["Event"] = []
@@ -292,15 +287,9 @@ class Macro:
         self.listener.start()
 
     def load_save (self):
-        #TODO Handle file that isnt formatted correctly
         self.saved_macro = []
-        try:
-            with open("config.json", 'r') as file:
-                json_data = json.load(file)
-                events = json_data["Profiles"][f"{current_profile.get()}"]["Gestures"][self.name]["Events"]
-        except FileNotFoundError or KeyError:
-            return
-      
+        events = loaded_profiles[str(current_profile.get())]["Gestures"][self.name]["Events"]
+        
         for event in events:
             try:
                 self.saved_macro.append(Event(keyboard.HotKey.parse(event["key"])[0], event["delay"], event["pressed"]))
@@ -312,29 +301,18 @@ class Macro:
         self.saved_macro = self.recording
         self.print()
         self.close_window(window)
-
-        #TODO Handle file that isnt formatted correctly
-        try:
-            with open("config.json", 'r') as file:
-                json_data = json.load(file)
-        except FileNotFoundError:
-            json_data = {"default_profile":0,"Profiles":{"0":{"Name":"Default", "Gestures":{self.name:{"Events":[]}}}}}
         
-        new_data = []
-        
+        new_events = []
         for event in self.saved_macro:
             try:
-                new_data.append({"key" : event.key.char, "delay" : event.delay, "pressed" : event.pressed})
+                new_events.append({"key" : event.key.char, "delay" : event.delay, "pressed" : event.pressed})
             except AttributeError:
-                new_data.append({"key" : str(event.key)[4:], "delay" : event.delay, "pressed" : event.pressed})
+                new_events.append({"key" : str(event.key)[4:], "delay" : event.delay, "pressed" : event.pressed})
 
-        try:
-            json_data["Profiles"][f"{current_profile.get()}"]["Gestures"][self.name]["Events"] = new_data
-        except KeyError:
-            json_data["Profiles"][f"{current_profile.get()}"] = {"Name":"Default", "Gestures":{self.name:{"Events":new_data}}}
+        global loaded_profiles
+        loaded_profiles[str(current_profile.get())]["Gestures"][self.name]["Events"] = new_events
 
-        with open("config.json", 'w') as file:
-            json.dump(json_data, file, indent=4)
+        save_profiles()
 
     #Close the window and stop the keyboard listener thread
     def close_window (self, window: tk.Toplevel):
