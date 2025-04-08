@@ -1,10 +1,12 @@
 import tkinter as tk
 from tkinter.messagebox import askyesno
+from tkinter import filedialog
 from detection import *
 from pynput import keyboard
 import time
 import json
 import threading
+import os
 
 gesture_list = ["peace"]
 root = tk.Tk()
@@ -63,9 +65,9 @@ def gui_window():
     profiles.add_cascade(label = "Change Profile", menu = profile_select)
     profiles.add_command(label = "Edit Profile Name", command=lambda: edit_profile_name(root.winfo_x(), root.winfo_y()))
     profiles.add_command(label = "Create New Profile", command=create_profile)
-    profiles.add_command(label = "Import Profile")
-    profiles.add_command(label = "Export Profile")
-    profiles.add_command(label = "Delete Profile", command=lambda: delete_profile(root.winfo_x(), root.winfo_y()))
+    profiles.add_command(label = "Import Profile", command=import_profile)
+    profiles.add_command(label = "Export Profile", command=export_profile)
+    profiles.add_command(label = "Delete Profile", command=delete_profile)
 
     settings = tk.Menu(menubar, tearoff = False)
     menubar.add_cascade(label = "Settings", menu = settings)
@@ -205,7 +207,6 @@ def edit_profile_name(x,y):
 
     popup.focus()
 
-
 def create_profile():
     global loaded_profiles
     new_index = str(int(max(loaded_profiles.keys())) + 1)
@@ -229,12 +230,12 @@ def create_profile():
     profile_changed()
 
 #Prompts user to delete current profile if there are more than 1 profile
-def delete_profile(x,y):
+def delete_profile():
     if len(loaded_profiles.keys()) == 1:
         return
     
     answer = askyesno(title="Confirmation", message=f"Permanently delete {loaded_profiles[str(current_profile.get())]['Name']}?")
-    
+
     #Deletes profile and updates the keys of the other profiles so that continue to act as indexes
     if answer:
         loaded_profiles.pop(str(current_profile.get()))
@@ -250,6 +251,35 @@ def delete_profile(x,y):
         profile_changed()
         load_profile_radiobuttons()
 
+#Prompts user to import a profile
+def import_profile():
+    file = filedialog.askopenfile(initialdir=os.getcwd(), filetypes=[("JSON files", "*.json")])
+
+    if file:
+        global loaded_profiles
+        new_index = str(int(max(loaded_profiles.keys())) + 1)
+        new_profile = json.load(file)
+
+        loaded_profiles[new_index] = new_profile
+        save_profiles()
+
+        profile_select.add_radiobutton(    
+            label=new_profile["Name"],
+            variable=current_profile,
+            value=new_index,
+            command=profile_changed
+        )
+
+        current_profile.set(new_index)
+        profile_changed()
+
+#Prompts user to save current profile
+def export_profile():
+    file = filedialog.asksaveasfile(initialdir=os.getcwd(), initialfile="export.json", filetypes=[("JSON files", "*.json")])
+    
+    if file:
+        json.dump(loaded_profiles[str(current_profile.get())], file, indent=4)
+        
 class Macro:
     saved_macro: list["Event"] = []
     recording = []
