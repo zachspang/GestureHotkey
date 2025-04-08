@@ -64,7 +64,7 @@ def gui_window():
     profiles.add_command(label = "Create New Profile", command=create_profile)
     profiles.add_command(label = "Import Profile")
     profiles.add_command(label = "Export Profile")
-    profiles.add_command(label = "Delete Profile")
+    profiles.add_command(label = "Delete Profile", command=lambda: delete_profile(root.winfo_x(), root.winfo_y()))
 
     settings = tk.Menu(menubar, tearoff = False)
     menubar.add_cascade(label = "Settings", menu = settings)
@@ -227,13 +227,56 @@ def create_profile():
     current_profile.set(new_index)
     profile_changed()
 
+#Prompts user to delete current profile if there are more than 1 profile
+def delete_profile(x,y):
+    if len(loaded_profiles.keys()) == 1:
+        return
+
+    popup = tk.Toplevel()
+    popup.wm_title = "Confirm Delete?"
+    popup.geometry(f"200x80+{x-20}+{y+20}")
+    
+    text_frame = tk.Frame(popup)
+    text_frame.pack(side = "top", fill = "x")
+
+    label = tk.Label(text_frame, text=f"Permanently delete {loaded_profiles[str(current_profile.get())]['Name']}?")
+    label.pack()
+
+    button_frame = tk.Frame(popup)
+    button_frame.pack(side = "bottom", fill = "x")
+
+    cancel = tk.Button(button_frame, text="Cancel", command=popup.destroy)
+    cancel.pack(side="right", anchor="se", padx=5, pady=5)
+
+    #Deletes profile and updates the keys of the other profiles so that continue to act as indexes
+    def confirm_delete():
+        loaded_profiles.pop(str(current_profile.get()))
+
+        index = 0
+        keys = list(loaded_profiles.keys())
+        for key in keys:
+            loaded_profiles[str(index)] = loaded_profiles.pop(key)
+            index += 1
+
+        save_profiles()
+        current_profile.set(min(loaded_profiles.keys()))
+        profile_changed()
+        load_profile_radiobuttons()
+
+        popup.destroy()
+
+    confirm = tk.Button(button_frame, text="Confirm", command=confirm_delete)
+    confirm.pack(side="right", anchor="se", padx=5, pady=5)
+
+    popup.focus()
+
+
 class Macro:
     saved_macro: list["Event"] = []
     recording = []
     last_event_time = 0
     active = False
 
-    #TODO: Instead of opening the file for each gesture this should read from a global variable loaded_profiles that holds the current config profiles
     def __init__ (self, name: str):
         self.name = name
         self.load_save()
