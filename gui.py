@@ -229,28 +229,6 @@ def create_profile():
     current_profile.set(new_index)
     profile_changed()
 
-#Prompts user to delete current profile if there are more than 1 profile
-def delete_profile():
-    if len(loaded_profiles.keys()) == 1:
-        return
-    
-    answer = askyesno(title="Confirmation", message=f"Permanently delete {loaded_profiles[str(current_profile.get())]['Name']}?")
-
-    #Deletes profile and updates the keys of the other profiles so that continue to act as indexes
-    if answer:
-        loaded_profiles.pop(str(current_profile.get()))
-
-        index = 0
-        keys = list(loaded_profiles.keys())
-        for key in keys:
-            loaded_profiles[str(index)] = loaded_profiles.pop(key)
-            index += 1
-
-        save_profiles()
-        current_profile.set(min(loaded_profiles.keys()))
-        profile_changed()
-        load_profile_radiobuttons()
-
 #Prompts user to import a profile
 def import_profile():
     file = filedialog.askopenfile(initialdir=os.getcwd(), filetypes=[("JSON files", "*.json")])
@@ -279,7 +257,29 @@ def export_profile():
     
     if file:
         json.dump(loaded_profiles[str(current_profile.get())], file, indent=4)
-        
+
+#Prompts user to delete current profile if there are more than 1 profile
+def delete_profile():
+    if len(loaded_profiles.keys()) == 1:
+        return
+    
+    answer = askyesno(title="Confirmation", message=f"Permanently delete {loaded_profiles[str(current_profile.get())]['Name']}?")
+
+    #Deletes profile and updates the keys of the other profiles so that continue to act as indexes
+    if answer:
+        loaded_profiles.pop(str(current_profile.get()))
+
+        index = 0
+        keys = list(loaded_profiles.keys())
+        for key in keys:
+            loaded_profiles[str(index)] = loaded_profiles.pop(key)
+            index += 1
+
+        save_profiles()
+        current_profile.set(min(loaded_profiles.keys()))
+        profile_changed()
+        load_profile_radiobuttons()
+
 class Macro:
     saved_macro: list["Event"] = []
     recording = []
