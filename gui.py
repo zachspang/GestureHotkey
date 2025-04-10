@@ -87,10 +87,10 @@ def gui_window():
     debug_toggle.pack()
    
     binding_frame = tk.Frame(root)
-    binding_frame.pack(side=tk.TOP, anchor="nw", padx=5, pady=0)
+    binding_frame.pack(side=tk.TOP, anchor="nw", padx=5, pady=0, expand=True, fill="y")
 
     label_frame = tk.Frame(binding_frame)
-    label_frame.grid(row=0,column=0, sticky="w")
+    label_frame.pack(anchor="nw")
     
     profile_label = tk.Label(label_frame, textvariable = current_profile_label)
     profile_label.grid(row=0,column=0)
@@ -103,9 +103,10 @@ def gui_window():
 
     #binding_frame holds the labels and macro_canvas_frame which holds macro_canvas. macro_canvas has a scrollbar and holds macro_button_frame
     macro_canvas_frame = tk.Frame(binding_frame)
-    macro_canvas_frame.grid(row=1,column=0)
+    macro_canvas_frame.pack(anchor="nw", expand=True, fill="y")
+    binding_frame.grid_rowconfigure(1, weight=1)
 
-    macro_canvas = tk.Canvas(macro_canvas_frame)
+    macro_canvas = tk.Canvas(macro_canvas_frame, width=140)
     scrollbar = tk.Scrollbar(macro_canvas_frame, orient="vertical", command=macro_canvas.yview)
     macro_canvas.configure(yscrollcommand=scrollbar.set)
 
@@ -123,8 +124,8 @@ def gui_window():
         record_btn.grid(row=index,column=1)
 
     macro_canvas.create_window((0,0), window=macro_button_frame, anchor="nw")
-    macro_canvas.grid(row=0, column=0, sticky="w")
-    scrollbar.grid(row=0,column=1,sticky="ns")
+    macro_canvas.pack(side="left", anchor="w", expand=True, fill="y")
+    scrollbar.pack(side="left", anchor="w", expand=True, fill="y")
 
     def _on_mousewheel(event):
         macro_canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
