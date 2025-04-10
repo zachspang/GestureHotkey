@@ -7,8 +7,10 @@ import time
 import json
 import threading
 import os
+from icons import get_icon
+import webbrowser
 
-gesture_list = ["peace"]
+gesture_list = ["peace", "fist", "call", "thumbs up", "thumbs down", "ok", "rock", "one", "three", "four", "palm", "stop"]
 root = tk.Tk()
 current_profile = tk.IntVar()
 current_profile_label = tk.StringVar()
@@ -74,6 +76,8 @@ def gui_window():
     settings.add_command(label = "Preferences", command = None)
     settings.add_checkbutton(label = "Run at Startup", command= None)
 
+    menubar.add_command(label="About", command=lambda: about_popup(root.winfo_x(), root.winfo_y()))
+
     root.config(menu = menubar)
 
     debug_frame = tk.Frame(root)
@@ -81,30 +85,51 @@ def gui_window():
 
     debug_toggle = tk.Checkbutton(debug_frame, text = "Enable Debug", height = 2, width = 10, command = toggle_debug) 
     debug_toggle.pack()
-
-    profile_label = tk.Label(root, textvariable = current_profile_label)
-    profile_label.pack(side=tk.TOP, anchor="nw", padx=10, pady=2)
    
     binding_frame = tk.Frame(root)
     binding_frame.pack(side=tk.TOP, anchor="nw", padx=5, pady=0)
 
-    gesture_label = tk.Label(binding_frame, text="Gesture", font="Helvetica 10 bold")
-    gesture_label.grid(row=0,column=0, padx=5,pady=0)
+    label_frame = tk.Frame(binding_frame)
+    label_frame.grid(row=0,column=0, sticky="w")
+    
+    profile_label = tk.Label(label_frame, textvariable = current_profile_label)
+    profile_label.grid(row=0,column=0)
 
-    macro_label = tk.Label(binding_frame, text="Macro", font="Helvetica 10 bold")
-    macro_label.grid(row=0,column=1, padx=5,pady=0)
+    gesture_label = tk.Label(label_frame, text="Gesture", font="Helvetica 10 bold")
+    gesture_label.grid(row=1,column=0, sticky="w")
 
-    #TODO: remake this to make each row instead of just one.
-    #Probably pass the binding frame to a function that loops a list of gestures to create the rows and check if they have saves
-    gesture_img = tk.PhotoImage(file="./icons/peace.png").subsample(4,4)
-    gesture_icon = tk.Label(binding_frame, image=gesture_img, height=50, width=50)
-    gesture_icon.grid(row=1,column=0)
+    macro_label = tk.Label(label_frame, text="Macro", font="Helvetica 10 bold")
+    macro_label.grid(row=1,column=1, sticky="w")
 
-    #TODO: Move record to col 2 and display an edit button in col1
-    record_btn = tk.Button(binding_frame, text="Record", command=lambda: macro_list[0].open_record_window(root.winfo_x(), root.winfo_y()))
-    record_btn.grid(row=1,column=1)
+    #binding_frame holds the labels and macro_canvas_frame which holds macro_canvas. macro_canvas has a scrollbar and holds macro_button_frame
+    macro_canvas_frame = tk.Frame(binding_frame)
+    macro_canvas_frame.grid(row=1,column=0)
 
-    #END ROW
+    macro_canvas = tk.Canvas(macro_canvas_frame)
+    scrollbar = tk.Scrollbar(macro_canvas_frame, orient="vertical", command=macro_canvas.yview)
+    macro_canvas.configure(yscrollcommand=scrollbar.set)
+
+    macro_button_frame = tk.Frame(macro_canvas)
+    macro_button_frame.bind("<Configure>", lambda e:macro_canvas.configure(scrollregion=macro_canvas.bbox("all")))
+
+    gesture_img_list = []
+    for index, gesture in enumerate(gesture_list):
+        gesture_img_list.append(tk.PhotoImage(data=get_icon(gesture)))        
+        gesture_icon = tk.Label(macro_button_frame, image=gesture_img_list[index], height=50, width=50)
+        gesture_icon.grid(row=index,column=0)
+        
+        #TODO: Move record to col 2 and display an edit button in col1
+        record_btn = tk.Button(macro_button_frame, text="Record", command=lambda index=index: macro_list[index].open_record_window(root.winfo_x(), root.winfo_y()))
+        record_btn.grid(row=index,column=1)
+
+    macro_canvas.create_window((0,0), window=macro_button_frame, anchor="nw")
+    macro_canvas.grid(row=0, column=0, sticky="w")
+    scrollbar.grid(row=0,column=1,sticky="ns")
+
+    def _on_mousewheel(event):
+        macro_canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+
+    macro_canvas.bind_all("<MouseWheel>", _on_mousewheel)
 
     #Every 16ms get an updated list of detections
     def check_detections():
@@ -280,6 +305,30 @@ def delete_profile():
         profile_changed()
         load_profile_radiobuttons()
 
+def about_popup(x,y):
+    def open_url(url):
+        webbrowser.open_new_tab(url)
+
+    popup = tk.Toplevel()
+    popup.wm_title = "About"
+    popup.geometry(f"230x200+{x-20}+{y+20}")
+
+    title = tk.Label(popup, text="GestureHotkey v0.1")
+    title.grid(row=0, column=0, padx=5, pady=5)
+
+    hagrid_link = tk.Label(popup, font=('Arial',8,'bold','underline'), text= "HaGRID used for hand gesture detection", fg="blue", cursor="hand2")
+    hagrid_link.grid(row=1, column=0, padx=5, pady=5)
+    hagrid_link.bind("<Button-1>", lambda e:open_url("https://github.com/hukenovs/hagrid"))
+
+    icons8_link = tk.Label(popup, font=('Arial',8,'bold','underline'), text = "Most gesture icons from Icons8", fg="blue", cursor="hand2")
+    icons8_link.grid(row=2, column=0, padx=5, pady=5)
+    icons8_link.bind("<Button-1>", lambda e:open_url("https://icons8.com/"))
+
+    close = tk.Button(popup, text="Close", command=popup.destroy)
+    close.grid(row=5, column=0, padx=5, pady=5)
+    
+
+
 class Macro:
     saved_macro: list["Event"] = []
     recording = []
@@ -304,7 +353,7 @@ class Macro:
 
         popup = tk.Toplevel()
         popup.wm_title = "Record Macro"
-        popup.geometry(f"300x300+{x-20}+{y+20}")
+        popup.geometry(f"300x300+{x+5}+{y+20}")
 
         cancel = tk.Button(popup, text="Cancel", command=lambda: self.close_window(popup))
         cancel.pack(side=tk.RIGHT, anchor="se", padx=5, pady=5)
