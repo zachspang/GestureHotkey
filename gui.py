@@ -335,6 +335,7 @@ class Macro:
     recording = []
     last_event_time = 0
     active = False
+    listener: keyboard.Listener = None
 
     def __init__ (self, name: str):
         self.name = name
@@ -355,6 +356,7 @@ class Macro:
         popup = tk.Toplevel()
         popup.wm_title = "Record Macro"
         popup.geometry(f"300x300+{x+5}+{y+20}")
+        popup.protocol("WM_DELETE_WINDOW", lambda: self.close_window(popup))
 
         cancel = tk.Button(popup, text="Cancel", command=lambda: self.close_window(popup))
         cancel.pack(side=tk.RIGHT, anchor="se", padx=5, pady=5)
@@ -442,7 +444,9 @@ class Macro:
     #Close the window and stop the keyboard listener thread
     def close_window (self, window: tk.Toplevel):
         window.destroy()
-        self.listener.stop()
+
+        if self.listener:
+            self.listener.stop()
 
     #Start a thread to call playback
     def start_playback (self):
