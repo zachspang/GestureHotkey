@@ -349,6 +349,48 @@ class Macro:
 
     #Create a popup window at coords x,y
     def open_record_window(self, x, y):
+        #Record inputs until save/cancel are pressed
+        def record():
+            held_keys = set()
+
+            #Handle a key being pressed
+            def on_press(key):
+                if key not in held_keys:
+                    held_keys.add(key)
+
+                    self.event_box.configure(state="normal")
+                    self.event_box.insert(tk.END, f"{key} pressed\n")
+                    self.event_box.configure(state="disabled")
+                    self.event_box.see(tk.END)
+
+                    if len(self.recording) == 0:
+                        self.recording.append(Event(key, 0, True))
+                        self.last_event_time = time.time_ns() / 1000000000
+                    else:
+                        self.recording.append(Event(key, (time.time_ns() / 1000000000) - self.last_event_time, True))
+                        self.last_event_time = time.time_ns() / 1000000000
+
+            #Handle a key being released
+            def on_release(key):
+                held_keys.remove(key)
+
+                self.event_box.configure(state="normal")
+                self.event_box.insert(tk.END, f"{key} released\n")
+                self.event_box.configure(state="disabled")
+                self.event_box.see(tk.END)
+
+                self.recording.append(Event(key, (time.time_ns() / 1000000000) - self.last_event_time, False))
+                self.last_event_time = time.time_ns() / 1000000000
+
+            self.last_event_time = 0
+            self.recording = []
+            self.listener = keyboard.Listener(
+                on_press=on_press,
+                on_release=on_release,
+                suppress=True)
+            
+            self.listener.start()
+
         #Reset recording and last_event_time incase there was a previous recording
         self.recording = []
         self.last_event_time = 0
@@ -369,49 +411,7 @@ class Macro:
         self.event_box.pack(side=tk.TOP, anchor="n", expand=True, fill="both")
 
         popup.focus()
-        self.record()
-
-    #Record inputs until save/cancel are pressed
-    def record(self):
-        held_keys = set()
-
-        #Handle a key being pressed
-        def on_press(key):
-            if key not in held_keys:
-                held_keys.add(key)
-
-                self.event_box.configure(state="normal")
-                self.event_box.insert(tk.END, f"{key} pressed\n")
-                self.event_box.configure(state="disabled")
-                self.event_box.see(tk.END)
-
-                if len(self.recording) == 0:
-                    self.recording.append(Event(key, 0, True))
-                    self.last_event_time = time.time_ns() / 1000000000
-                else:
-                    self.recording.append(Event(key, (time.time_ns() / 1000000000) - self.last_event_time, True))
-                    self.last_event_time = time.time_ns() / 1000000000
-
-        #Handle a key being released
-        def on_release(key):
-            held_keys.remove(key)
-
-            self.event_box.configure(state="normal")
-            self.event_box.insert(tk.END, f"{key} released\n")
-            self.event_box.configure(state="disabled")
-            self.event_box.see(tk.END)
-
-            self.recording.append(Event(key, (time.time_ns() / 1000000000) - self.last_event_time, False))
-            self.last_event_time = time.time_ns() / 1000000000
-
-        self.last_event_time = 0
-        self.recording = []
-        self.listener = keyboard.Listener(
-            on_press=on_press,
-            on_release=on_release,
-            suppress=True)
-        
-        self.listener.start()
+        record()
 
     def load_save (self):
         self.saved_macro = []
@@ -450,22 +450,22 @@ class Macro:
 
     #Start a thread to call playback
     def start_playback (self):
-        play_thread = threading.Thread(target=self.playback, daemon=True)
-        play_thread.start()
+        #Play the saved macro
+        def playback ():
+            self.active = True
+            controller = keyboard.Controller()
 
-    #Play the saved macro
-    def playback (self):
-        self.active = True
-        controller = keyboard.Controller()
-
-        for event in self.saved_macro:
-            time.sleep(event.delay)
-            if event.pressed: 
-                controller.press(event.key)
-            else:
-                controller.release(event.key)
+            for event in self.saved_macro:
+                time.sleep(event.delay)
+                if event.pressed: 
+                    controller.press(event.key)
+                else:
+                    controller.release(event.key)
         
-        self.active = False
+            self.active = False
+
+        play_thread = threading.Thread(target=playback, daemon=True)
+        play_thread.start()
                
 #A single event, either a key being pressed or released and the about of time in seconds since the last event.
 class Event:
