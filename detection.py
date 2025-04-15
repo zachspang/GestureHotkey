@@ -1,3 +1,6 @@
+import os
+os.environ["OPENCV_LOG_LEVEL"] = "E"
+os.environ["OPENCV_VIDEOIO_MSMF_ENABLE_HW_TRANSFORMS"] = "0"
 import cv2
 import mediapipe as mp
 import time
@@ -7,6 +10,7 @@ import ultralytics.engine.results
 
 debug = False
 detections = []
+cam_index = 0
 
 def detection_window ():
     # Load a pretrained YOLO model trained on HaGRID
@@ -23,17 +27,25 @@ def detection_window ():
     mp_hands = mp.solutions.hands
 
     # Start webcam
-    cap = cv2.VideoCapture(0)
+    curr_cam_index = cam_index
+    cap = cv2.VideoCapture(cam_index)
 
     with mp_hands.Hands(
         model_complexity=0,
         min_detection_confidence=0.5,
         min_tracking_confidence=0.5) as hands:
-        while cap.isOpened():   
+        while cap.isOpened(): 
+            if cam_index != curr_cam_index:
+                if cam_index == -1:
+                    cap.release()
+                else:
+                    curr_cam_index = cam_index
+                    cap.release()
+                    cap = cv2.VideoCapture(cam_index)
+
             frame_start_time = time.time()
             success, image = cap.read()
             if not success:
-                print("Ignoring empty camera frame.")
                 continue
 
             # To improve performance, mark the image as not writeable to pass by reference.
@@ -78,3 +90,10 @@ def get_detections():
 def toggle_debug():
     global debug
     debug = not debug
+
+def set_cam(new_index):
+    global cam_index
+    cam_index = new_index
+
+def get_cam():
+    return cam_index

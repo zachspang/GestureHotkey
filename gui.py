@@ -1,21 +1,24 @@
 import tkinter as tk
 from tkinter.messagebox import askyesno
-from tkinter import filedialog
+from tkinter import filedialog, ttk
 from detection import *
 from pynput import keyboard
 import time
 import json
-import threading
+from threading import Thread
 import os
 from icons import get_icon
 import webbrowser
+import cv2
+from cv2_enumerate_cameras import enumerate_cameras
+from PIL import ImageTk, Image, ImageDraw, ImageFont
 
 gesture_list = ["peace", "fist", "call", "thumbs up", "thumbs down", "ok", "rock", "one", "three", "four", "palm", "stop"]
 root = tk.Tk()
 current_profile = tk.IntVar()
 current_profile_label = tk.StringVar()
 profile_select:tk.Menu
-loaded_profiles = {}
+loaded_config = {}
 macro_list = []
 
 def gui_window():
@@ -31,29 +34,27 @@ def gui_window():
     global profile_select
     profile_select = tk.Menu(menubar, tearoff=False)
 
-    global loaded_profiles
+    global loaded_config
     global macro_list
 
     try:
         with open("config.json", 'r') as file:
-            json_data = json.load(file)
-            loaded_profiles = json_data["Profiles"]
-            current_profile.set(json_data["default_profile"])
-            current_profile_label.set(f"Profile: {loaded_profiles[str(current_profile.get())]['Name']}")
+            loaded_config = json.load(file)
+            current_profile.set(loaded_config["default_profile"])
+            current_profile_label.set(f"Profile: {loaded_config['Profiles'][str(current_profile.get())]['Name']}")
             macro_list = [Macro(gesture) for gesture in gesture_list]
             print(f"Loaded {current_profile_label.get()}")
             
     except FileNotFoundError:
-        json_data = {"default_profile":0,"Profiles":{"0":{"Name":"Default", "Gestures":{}}}}
+        loaded_config = {"default_profile":0,"default_cam":0,"Profiles":{"0":{"Name":"Default", "Gestures":{}}}}
         for gesture in gesture_list:
-            json_data["Profiles"]["0"]["Gestures"][gesture] = {}
-            json_data["Profiles"]["0"]["Gestures"][gesture]["Events"] = []
+            loaded_config["Profiles"]["0"]["Gestures"][gesture] = {}
+            loaded_config["Profiles"]["0"]["Gestures"][gesture]["Events"] = []
         with open("config.json", 'w') as file:
-            json.dump(json_data, file, indent=4)
+            json.dump(loaded_config, file, indent=4)
 
-        loaded_profiles = json_data["Profiles"]
-        current_profile.set(json_data["default_profile"])
-        current_profile_label.set(f"Profile: {loaded_profiles[str(current_profile.get())]['Name']}")
+        current_profile.set(loaded_config["default_profile"])
+        current_profile_label.set(f"Profile: {loaded_config['Profiles'][str(current_profile.get())]['Name']}")
 
         profile_select.add_radiobutton(    
           label="Default",
@@ -63,6 +64,7 @@ def gui_window():
         )
 
     load_profile_radiobuttons()
+    set_cam(loaded_config["default_cam"])
 
     profiles.add_cascade(label = "Change Profile", menu = profile_select)
     profiles.add_command(label = "Edit Profile Name", command=lambda: edit_profile_name(root.winfo_x(), root.winfo_y()))
@@ -73,7 +75,7 @@ def gui_window():
 
     settings = tk.Menu(menubar, tearoff = False)
     menubar.add_cascade(label = "Settings", menu = settings)
-    settings.add_command(label = "Preferences", command = None)
+    settings.add_command(label = "Camera Settings", command = lambda: camera_settings(root.winfo_x(), root.winfo_y()))
     settings.add_checkbutton(label = "Run at Startup", command= None)
 
     menubar.add_command(label="About", command=lambda: about_popup(root.winfo_x(), root.winfo_y()))
@@ -148,23 +150,14 @@ def gui_window():
 
 #Reloads the macro_list with the settings from the new profile and changes the default profile
 def profile_changed():
-    global loaded_profiles
+    global loaded_config
     global macro_list
 
-    current_profile_label.set(f"Profile: {loaded_profiles[str(current_profile.get())]['Name']}")
-
-    try:
-        with open("config.json", 'r') as file:
-            json_data = json.load(file)
-    except FileNotFoundError:
-        json_data = {}
+    current_profile_label.set(f"Profile: {loaded_config['Profiles'][str(current_profile.get())]['Name']}")
 
     macro_list = [Macro(gesture) for gesture in gesture_list]
-    loaded_profiles = json_data["Profiles"]
-    json_data["default_profile"] = current_profile.get()
-
-    with open("config.json", 'w') as file:
-        json.dump(json_data, file, indent=4)
+    loaded_config["default_profile"] = current_profile.get()
+    save_config()
     
     print(f"Loaded {current_profile_label.get()}")
     root.update_idletasks()
@@ -173,26 +166,18 @@ def profile_changed():
 def load_profile_radiobuttons():
     profile_select.delete(0, 'end')
 
-    for profile in loaded_profiles.keys():
+    for profile in loaded_config["Profiles"].keys():
         profile_select.add_radiobutton(    
-            label=loaded_profiles[profile]["Name"],
+            label=loaded_config["Profiles"][profile]["Name"],
             variable=current_profile,
             value=profile,
             command=profile_changed
         )
 
-#Writes loaded_profiles to config
-def save_profiles():
-    try:
-        with open("config.json", 'r') as file:
-            json_data = json.load(file)
-    except FileNotFoundError:
-        json_data = {}
-
-    json_data["Profiles"] = loaded_profiles
-
+#Writes loaded_config to config
+def save_config():
     with open("config.json", 'w') as file:
-        json.dump(json_data, file, indent=4)
+        json.dump(loaded_config, file, indent=4)
 
 #Pops out a window where a user can change the name of a profile
 def edit_profile_name(x,y):
@@ -221,8 +206,8 @@ def edit_profile_name(x,y):
             popup.destroy()
             return
 
-        loaded_profiles[str(current_profile.get())]['Name'] = new_name
-        save_profiles()
+        loaded_config["Profiles"][str(current_profile.get())]['Name'] = new_name
+        save_config()
         load_profile_radiobuttons()
         current_profile_label.set("Profile: " + new_name)
 
@@ -234,16 +219,16 @@ def edit_profile_name(x,y):
     popup.focus()
 
 def create_profile():
-    global loaded_profiles
-    new_index = str(int(max(loaded_profiles.keys())) + 1)
+    global loaded_config
+    new_index = str(int(max(loaded_config["Profiles"].keys())) + 1)
     new_profile = {"Name":f"Profile {new_index}", "Gestures":{}}
 
     for gesture in gesture_list:
         new_profile["Gestures"][gesture] = {}
         new_profile["Gestures"][gesture]["Events"] = []
 
-    loaded_profiles[new_index] = new_profile
-    save_profiles()
+    loaded_config["Profiles"][new_index] = new_profile
+    save_config()
 
     profile_select.add_radiobutton(    
         label=f"Profile {new_index}",
@@ -260,12 +245,12 @@ def import_profile():
     file = filedialog.askopenfile(initialdir=os.getcwd(), filetypes=[("JSON files", "*.json")])
 
     if file:
-        global loaded_profiles
-        new_index = str(int(max(loaded_profiles.keys())) + 1)
+        global loaded_config
+        new_index = str(int(max(loaded_config["Profiles"].keys())) + 1)
         new_profile = json.load(file)
 
-        loaded_profiles[new_index] = new_profile
-        save_profiles()
+        loaded_config["Profiles"][new_index] = new_profile
+        save_config()
 
         profile_select.add_radiobutton(    
             label=new_profile["Name"],
@@ -282,27 +267,27 @@ def export_profile():
     file = filedialog.asksaveasfile(initialdir=os.getcwd(), initialfile="export.json", filetypes=[("JSON files", "*.json")])
     
     if file:
-        json.dump(loaded_profiles[str(current_profile.get())], file, indent=4)
+        json.dump(loaded_config["Profiles"][str(current_profile.get())], file, indent=4)
 
 #Prompts user to delete current profile if there are more than 1 profile
 def delete_profile():
-    if len(loaded_profiles.keys()) == 1:
+    if len(loaded_config["Profiles"].keys()) == 1:
         return
     
-    answer = askyesno(title="Confirmation", message=f"Permanently delete {loaded_profiles[str(current_profile.get())]['Name']}?")
+    answer = askyesno(title="Confirmation", message=f"Permanently delete {loaded_config['Profiles'][str(current_profile.get())]['Name']}?")
 
     #Deletes profile and updates the keys of the other profiles so that continue to act as indexes
     if answer:
-        loaded_profiles.pop(str(current_profile.get()))
+        loaded_config["Profiles"].pop(str(current_profile.get()))
 
         index = 0
-        keys = list(loaded_profiles.keys())
+        keys = list(loaded_config["Profiles"].keys())
         for key in keys:
-            loaded_profiles[str(index)] = loaded_profiles.pop(key)
+            loaded_config["Profiles"][str(index)] = loaded_config["Profiles"].pop(key)
             index += 1
 
-        save_profiles()
-        current_profile.set(min(loaded_profiles.keys()))
+        save_config()
+        current_profile.set(min(loaded_config["Profiles"].keys()))
         profile_changed()
         load_profile_radiobuttons()
 
@@ -328,7 +313,113 @@ def about_popup(x,y):
     close = tk.Button(popup, text="Close", command=popup.destroy)
     close.grid(row=5, column=0, padx=5, pady=5)
     
+def camera_settings(x,y):
+    prev_cam = get_cam()
+    #End detection thread
+    set_cam(-1)
 
+    popup = tk.Toplevel()
+    cap:cv2.VideoCapture = None
+
+    #Close the popup and start detection thread
+    def close_window():
+        if get_cam() == -1:
+            set_cam(prev_cam)
+
+        popup.destroy()
+
+        detection_thread = Thread(target=detection_window, daemon=True)
+        detection_thread.start()
+    
+    def save_and_close():
+        set_cam(combo.current())
+        loaded_config["default_cam"] = combo.current()
+        save_config()
+        close_window()
+
+    popup.protocol("WM_DELETE_WINDOW", lambda: close_window())
+    popup.wm_title = "Select Camera"
+    popup.geometry(f"300x300+{x+5}+{y+20}")
+
+    options = []
+    for camera in enumerate_cameras(cv2.CAP_DSHOW):
+        options.append(camera.name)
+
+    combo = ttk.Combobox(popup, values=options, state="readonly")
+
+    if loaded_config["default_cam"] < len(options):
+        combo.current(loaded_config["default_cam"])  
+    else:
+        combo.current(0)  
+
+    combo.pack()
+    
+    display_frame = tk.Frame(popup, bg = "black", width=250, height= 200)
+    display_frame.pack(pady=10)
+
+    image_label = tk.Label(display_frame, width=250, height= 200)
+    image_label.pack()
+
+    curr_cam_index = combo.current()
+    starting_cap = False
+
+    def video_stream():
+        #Start a new capture
+        def start_capture():
+            nonlocal cap
+            nonlocal starting_cap
+
+            cap = cv2.VideoCapture(combo.current())
+            starting_cap = False
+        
+        nonlocal cap
+        nonlocal curr_cam_index
+        nonlocal starting_cap
+
+        start_cap = Thread(target=start_capture, daemon=True)
+
+        #If the capture selected is not the one open, close it
+        if cap and combo.current() != curr_cam_index:
+            cap.release()
+            cap = None
+            curr_cam_index = combo.current()
+
+        #Open a new capture if there is not one and one is not in the process of starting
+        if not cap and not starting_cap:
+            starting_cap = True
+            start_cap.start()
+        
+        font = ImageFont.truetype('arial', 24)
+
+        #If there is a capture read it and if the read is successful display it, if the read fails display a black screen, if there is no capture it must be starting so display loading
+        if cap:
+            success, frame = cap.read()
+            if success:
+                image = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGBA))
+                image = image.resize((250,200))
+            else:
+                image = Image.new(mode="RGB", size=(250,200))
+                draw = ImageDraw.Draw(image)
+                draw.text((0,0), "Could not start device.", (256,256,256), font=font)
+        else:
+            image = Image.new(mode="RGB", size=(250,200))
+            draw = ImageDraw.Draw(image)
+            draw.text((0,0), "Loading ...", (256,256,256), font=font)
+
+        imageTk = ImageTk.PhotoImage(image=image)
+        image_label.imageTk = imageTk
+        image_label.configure(image=imageTk)
+
+        image_label.after(16, video_stream)
+
+    cancel = tk.Button(popup, text="Cancel", command=close_window)
+    cancel.pack(side=tk.RIGHT, anchor="se", padx=5, pady=5)
+    
+    save = tk.Button(popup, text="Save", command=save_and_close)
+    save.pack(side=tk.RIGHT, anchor="se", padx=5, pady=5)
+
+    video_stream()
+    popup.focus()
 
 class Macro:
     saved_macro: list["Event"] = []
@@ -415,7 +506,7 @@ class Macro:
 
     def load_save (self):
         self.saved_macro = []
-        events = loaded_profiles[str(current_profile.get())]["Gestures"][self.name]["Events"]
+        events = loaded_config["Profiles"][str(current_profile.get())]["Gestures"][self.name]["Events"]
 
         for event in events:
             try:
@@ -436,10 +527,10 @@ class Macro:
             except AttributeError:
                 new_events.append({"key" : str(event.key)[4:], "delay" : event.delay, "pressed" : event.pressed})
 
-        global loaded_profiles
-        loaded_profiles[str(current_profile.get())]["Gestures"][self.name]["Events"] = new_events
+        global loaded_config
+        loaded_config["Profiles"][str(current_profile.get())]["Gestures"][self.name]["Events"] = new_events
 
-        save_profiles()
+        save_config()
 
     #Close the window and stop the keyboard listener thread
     def close_window (self, window: tk.Toplevel):
@@ -464,7 +555,7 @@ class Macro:
         
             self.active = False
 
-        play_thread = threading.Thread(target=playback, daemon=True)
+        play_thread = Thread(target=playback, daemon=True)
         play_thread.start()
                
 #A single event, either a key being pressed or released and the about of time in seconds since the last event.
