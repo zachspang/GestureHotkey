@@ -122,8 +122,8 @@ def gui_window():
         gesture_icon.grid(row=index,column=0)
         
         #TODO: Move record to col 2 and display an edit button in col1
-        record_btn = tk.Button(macro_button_frame, text="Record", command=lambda index=index: macro_list[index].open_record_window(root.winfo_x(), root.winfo_y()))
-        record_btn.grid(row=index,column=1)
+        edit_btn = tk.Button(macro_button_frame, text="Edit", command=lambda index=index: macro_list[index].open_edit_window(root.winfo_x(), root.winfo_y()))
+        edit_btn.grid(row=index,column=1)
 
     macro_canvas.create_window((0,0), window=macro_button_frame, anchor="nw")
     macro_canvas.pack(side="left", anchor="w", expand=True, fill="y")
@@ -423,6 +423,7 @@ def camera_settings(x,y):
 
 class Macro:
     saved_macro: list["Event"] = []
+    lboxvar:tk.StringVar
     recording = []
     last_event_time = 0
     active = False
@@ -517,6 +518,8 @@ class Macro:
     #Save recording and close the window
     def save_and_close (self, window: tk.Toplevel):
         self.saved_macro = self.recording
+        self.lboxvar.set([str(x.key) for x in self.saved_macro])
+
         self.print()
         self.close_window(window)
         
@@ -557,7 +560,19 @@ class Macro:
 
         play_thread = Thread(target=playback, daemon=True)
         play_thread.start()
-               
+    
+    def open_edit_window(self,x,y):
+        popup = tk.Toplevel()
+        popup.wm_title = "Edit Macro"
+        popup.geometry(f"300x300+{x+5}+{y+20}")
+
+        self.lboxvar = tk.StringVar(value=[str(x.key) for x in self.saved_macro])
+        lbox = tk.Listbox(popup, listvariable=self.lboxvar, height=50)
+        lbox.pack(side="left")
+
+        record = tk.Button(popup, text="Record", command=lambda: self.open_record_window(popup.winfo_x(), popup.winfo_y()))
+        record.pack(side="right")
+
 #A single event, either a key being pressed or released and the about of time in seconds since the last event.
 class Event:
 
