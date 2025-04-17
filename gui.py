@@ -423,7 +423,7 @@ def camera_settings(x,y):
 
 class Macro:
     saved_macro: list["Event"] = []
-    lboxvar:tk.StringVar
+    lboxvar = tk.StringVar()
     recording = []
     last_event_time = 0
     active = False
@@ -450,8 +450,14 @@ class Macro:
                 if key not in held_keys:
                     held_keys.add(key)
 
+                    keyname = str(key)
+                    if keyname[:4] == "Key.":
+                        keyname = keyname[4:]
+                        keyname = keyname.capitalize()
+                        keyname = keyname.replace("_", " ")
+
                     self.event_box.configure(state="normal")
-                    self.event_box.insert(tk.END, f"{key} pressed\n")
+                    self.event_box.insert(tk.END, f"{keyname} pressed\n")
                     self.event_box.configure(state="disabled")
                     self.event_box.see(tk.END)
 
@@ -465,9 +471,15 @@ class Macro:
             #Handle a key being released
             def on_release(key):
                 held_keys.remove(key)
+            
+                keyname = str(key)
+                if keyname[:4] == "Key.":
+                    keyname = keyname[4:]
+                    keyname = keyname.capitalize()
+                    keyname = keyname.replace("_", " ")
 
                 self.event_box.configure(state="normal")
-                self.event_box.insert(tk.END, f"{key} released\n")
+                self.event_box.insert(tk.END, f"{keyname} released\n")
                 self.event_box.configure(state="disabled")
                 self.event_box.see(tk.END)
 
@@ -513,12 +525,12 @@ class Macro:
             try:
                 self.saved_macro.append(Event(keyboard.HotKey.parse(event["key"])[0], event["delay"], event["pressed"]))
             except ValueError: 
-                self.saved_macro.append(Event(keyboard.HotKey.parse(f"<{event['key']}>")[0], event["delay"], event["pressed"]))
+                self.saved_macro.append(Event(keyboard.Key(keyboard.HotKey.parse(f"<{event['key']}>")[0]), event["delay"], event["pressed"]))
 
     #Save recording and close the window
     def save_and_close (self, window: tk.Toplevel):
         self.saved_macro = self.recording
-        self.lboxvar.set([str(x.key) for x in self.saved_macro])
+        self.update_lbox()
 
         self.print()
         self.close_window(window)
@@ -561,17 +573,93 @@ class Macro:
         play_thread = Thread(target=playback, daemon=True)
         play_thread.start()
     
+    def update_lbox(self):
+        new_lbox = []
+        for event in self.saved_macro:
+            list_string = str(event.key)
+            if list_string[:4] == "Key.":
+                list_string = list_string[4:]
+                list_string = list_string.capitalize()
+                list_string = list_string.replace("_", " ")
+            else:
+                list_string = list_string[1:-1]
+
+            if event.pressed:
+                list_string = "\u2193 " + list_string
+            else:
+                list_string = "\u2191 " + list_string
+
+            new_lbox.append(list_string)
+        self.lboxvar.set(new_lbox)
+
     def open_edit_window(self,x,y):
+        
         popup = tk.Toplevel()
         popup.wm_title = "Edit Macro"
         popup.geometry(f"300x300+{x+5}+{y+20}")
 
-        self.lboxvar = tk.StringVar(value=[str(x.key) for x in self.saved_macro])
-        lbox = tk.Listbox(popup, listvariable=self.lboxvar, height=50)
-        lbox.pack(side="left")
+        self.update_lbox()
+        lbox = tk.Listbox(popup, listvariable=self.lboxvar, width=10, height=12, font="Helvetica 14 bold", selectmode=tk.SINGLE)
+        lbox.pack(padx=5, side="left")
+
+        all_keys = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 
+                    'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', '!', '"', '#', '$', '%', '&', 
+                    "'", '(', ')', '*', '+', ',', '-', '.', '/', ':', ';', '<', '=', '>', '?', '@', '[', '\\', ']', '^', '_', 
+                    '`', '{', '|', '}', '~', 'Alt', 'Alt l', 'Alt r', 'Alt gr', 'Backspace', 'Caps lock', 'Cmd', 'Cmd r', 'Ctrl', 
+                    'Ctrl l', 'Ctrl r', 'Delete', 'Down', 'End', 'Enter', 'Esc', 'F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'F8', 
+                    'F9', 'F10', 'F11', 'F12', 'F13', 'F14', 'F15', 'F16', 'F17', 'F18', 'F19', 'F20', 'F21', 'F22', 'F23', 'F24', 
+                    'Home', 'Left', 'Page down', 'Page up', 'Right', 'Shift', 'Shift r', 'Space', 'Tab', 'Up', 'Media play pause', 
+                    'Media stop', 'Media volume mute', 'Media volume down', 'Media volume up', 'Media previous', 'Media next', 'Insert', 
+                    'Menu', 'Num lock', 'Pause', 'Print screen', 'Scroll lock'
+                ]
+        
+        key_selection = ttk.Combobox(popup, values=all_keys, state="disabled")
+        key_selection.pack()
+        #Delay entry
+        #Press/Release toggle
+
+        def entry_changed(event):
+            entry = event.widget.get()
+            #update delay
+        
+        def validate_entry(char):
+            return str.isdigit(char) or char == "."
+
+        vcmd = popup.register(validate_entry)
+        delay_entry = tk.Entry(popup, state="readonly", validate="key", validatecommand=(vcmd, "%S",))
+        delay_entry.pack()
+        delay_entry.bind("<KeyRelease>", entry_changed)
+        def item_selected(event):
+            if not event.widget.curselection():
+                key_selection.current(0)
+                key_selection.configure(state="disabled")
+                #Reset delay
+                delay_entry.delete(0, tk.END)
+                delay_entry.configure(state="readonly")
+                #Reset pressed
+                return
+            selection = self.saved_macro[event.widget.curselection()[0]]
+
+            keyname = str(selection.key)
+            if keyname[:4] == "Key.":
+                keyname = keyname[4:]
+                keyname = keyname.capitalize()
+                keyname = keyname.replace("_", " ")
+            else:
+                keyname = keyname[1:-1]
+
+            key_selection.configure(state="readonly")
+            key_selection.current(all_keys.index(keyname))
+            #update delay
+            delay_entry.configure(state="normal")
+            delay_entry.delete(0, tk.END)
+            delay_entry.insert(0, round(selection.delay, 3))
+            #update press/release
+
+        lbox.bind('<<ListboxSelect>>', item_selected)
 
         record = tk.Button(popup, text="Record", command=lambda: self.open_record_window(popup.winfo_x(), popup.winfo_y()))
-        record.pack(side="right")
+        record.pack(padx=5, side="right")
 
 #A single event, either a key being pressed or released and the about of time in seconds since the last event.
 class Event:
