@@ -134,15 +134,36 @@ def gui_window():
 
     macro_canvas.bind_all("<MouseWheel>", _on_mousewheel)
 
+    previously_detected = []
+    waiting_to_release = set()
+
     #Every 16ms get an updated list of detections
     def check_detections():
+        nonlocal previously_detected
         detections = get_detections()
-        for detection in detections:
-            for macro in macro_list:
-                if detection["name"] == macro.name:
+        currently_detected = [detection["name"] for detection in detections]
+
+        #If a detection is no longer detected add it to a set. when the macro is done its keys will be released unless it is detected again while playing
+        for detection in previously_detected:
+            if detection not in currently_detected:
+                waiting_to_release.add(detection)
+
+        for macro in macro_list:
+            for detection in detections:
+                if macro.name == detection["name"]:
+                    try:
+                        waiting_to_release.remove(macro.name)
+                    except KeyError:
+                        pass
+
                     if detection["confidence"] > 0.8 and not macro.active:
                         macro.start_playback()
-                    
+
+            if macro.name in waiting_to_release and not macro.active:
+                macro.start_release()
+                waiting_to_release.remove(macro.name)
+        
+        previously_detected = currently_detected
         root.after(16, check_detections)
 
     check_detections()
@@ -525,15 +546,20 @@ class Macro:
             try:
                 self.saved_macro.append(Event(keyboard.HotKey.parse(event["key"])[0], event["delay"], event["pressed"]))
             except ValueError: 
-                self.saved_macro.append(Event(keyboard.Key(keyboard.HotKey.parse(f"<{event['key']}>")[0]), event["delay"], event["pressed"]))
+                self.saved_macro.append(Event(eval(f"keyboard.Key.{event['key']}"), event["delay"], event["pressed"]))
 
     #Save recording and close the window
     def save_and_close (self, window: tk.Toplevel):
-        self.saved_macro = self.recording
-        self.update_lbox()
-
-        self.print()
+        self.save()
         self.close_window(window)
+        
+    #Save the macro
+    def save(self):
+        if len(self.recording) != 0:
+            self.saved_macro = self.recording
+
+        self.update_lbox()
+        self.print()
         
         new_events = []
         for event in self.saved_macro:
@@ -550,6 +576,7 @@ class Macro:
     #Close the window and stop the keyboard listener thread
     def close_window (self, window: tk.Toplevel):
         window.destroy()
+        self.recording = []
 
         if self.listener:
             self.listener.stop()
@@ -573,6 +600,16 @@ class Macro:
         play_thread = Thread(target=playback, daemon=True)
         play_thread.start()
     
+    #Start a thread to release all held keys
+    def start_release(self):
+        def release():
+            controller = keyboard.Controller()
+            for event in self.saved_macro:
+                controller.release(event.key)
+
+        release_thread = Thread(target=release, daemon=True)
+        release_thread.start()
+
     def update_lbox(self):
         new_lbox = []
         for event in self.saved_macro:
@@ -599,9 +636,10 @@ class Macro:
         popup.geometry(f"300x300+{x+5}+{y+20}")
 
         self.update_lbox()
-        lbox = tk.Listbox(popup, listvariable=self.lboxvar, width=10, height=12, font="Helvetica 14 bold", selectmode=tk.SINGLE)
+        lbox = tk.Listbox(popup, listvariable=self.lboxvar, width=10, height=12, font="Helvetica 14 bold", selectmode=tk.SINGLE, exportselection=False)
         lbox.pack(padx=5, side="left")
 
+        #key_selection combobox that lets users change the key of an event
         all_keys = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 
                     'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', '!', '"', '#', '$', '%', '&', 
                     "'", '(', ')', '*', '+', ',', '-', '.', '/', ':', ';', '<', '=', '>', '?', '@', '[', '\\', ']', '^', '_', 
@@ -613,22 +651,46 @@ class Macro:
                     'Menu', 'Num lock', 'Pause', 'Print screen', 'Scroll lock'
                 ]
         
+        def key_changed(event):
+            new_key:str = event.widget.get()
+            new_key = new_key.replace(" ", "_").lower()
+            try:
+                new_key = keyboard.HotKey.parse(new_key)[0]
+            except ValueError:
+                new_key = eval(f"keyboard.Key.{new_key}")
+            self.saved_macro[lbox.curselection()[0]].key = new_key
+            self.save()
+
         key_selection = ttk.Combobox(popup, values=all_keys, state="disabled")
         key_selection.pack()
-        #Delay entry
-        #Press/Release toggle
+        key_selection.bind("<<ComboboxSelected>>", key_changed)
 
+        #delay_entry text box that lets users change delay of an event
         def entry_changed(event):
             entry = event.widget.get()
-            #update delay
+            if entry == "":
+                delay_entry.insert(0,"0")
+                return
+
+            self.saved_macro[lbox.curselection()[0]].delay = float(entry)
+            self.save()
         
-        def validate_entry(char):
-            return str.isdigit(char) or char == "."
+        def validate_entry(new_entry):
+            if not new_entry:
+                return True
+            try:
+                float(new_entry)
+                return True
+            except ValueError:
+                return False
 
         vcmd = popup.register(validate_entry)
-        delay_entry = tk.Entry(popup, state="readonly", validate="key", validatecommand=(vcmd, "%S",))
+        delay_entry = tk.Entry(popup, state="readonly", validate="key", validatecommand=(vcmd, "%P",))
         delay_entry.pack()
         delay_entry.bind("<KeyRelease>", entry_changed)
+
+        #Press/release toggle
+
         def item_selected(event):
             if not event.widget.curselection():
                 key_selection.current(0)
