@@ -693,7 +693,7 @@ class Macro:
         pressed_var = tk.BooleanVar(value=True)
 
         def toggle_press(_var, _index, _mode):
-            if self.saved_macro[lbox.curselection()[0]].pressed != pressed_var.get():
+            if len(self.saved_macro) != 0 and lbox.curselection() and self.saved_macro[lbox.curselection()[0]].pressed != pressed_var.get():
                 self.saved_macro[lbox.curselection()[0]].pressed = pressed_var.get()
                 self.save()
 
@@ -739,8 +739,40 @@ class Macro:
         down_button = tk.Button(popup, text="v", height=1,width=3, font="Helvetica 20 bold", command= move_down, state="disabled")
         down_button.pack(side="bottom")
 
+        #Buttons to add and delete events
+        def add_event():
+            if lbox.curselection():
+                index = lbox.curselection()[0]
+            else:
+                index = 0
+            self.saved_macro.insert(index, Event(key=keyboard.HotKey.parse("0")[0],delay=0, pressed=True))
+
+            lbox.selection_clear(0, tk.END)
+            lbox.activate(index)
+            lbox.selection_set(index)
+            lbox.event_generate('<<ListboxSelect>>')
+
+            self.save()
+
+        def remove_event():
+            index = lbox.curselection()[0]
+            self.saved_macro.pop(index)
+
+            lbox.selection_clear(0, tk.END)
+            lbox.activate(index)
+            lbox.selection_set(index)
+            lbox.event_generate('<<ListboxSelect>>')
+
+            self.save()
+
+        add_button = tk.Button(popup, text="+", height=1,width=3, font="Helvetica 20 bold", command=add_event, state="normal")
+        add_button.pack(side="bottom")
+
+        del_button = tk.Button(popup, text="-", height=1,width=3, font="Helvetica 20 bold", command=remove_event, state="disabled")
+        del_button.pack(side="bottom")
+
         def item_selected(event):
-            if not event.widget.curselection():
+            if not event.widget.curselection() or len(self.saved_macro) == 0:
                 #Reset key_selection
                 key_selection.current(0)
                 key_selection.configure(state="disabled")
@@ -758,6 +790,8 @@ class Macro:
                 up_button.configure(state="disabled")
                 down_button.configure(state="disabled")
 
+                #Disable del button
+                del_button.configure(state="disabled")
                 return
             selection = self.saved_macro[event.widget.curselection()[0]]
             
@@ -786,6 +820,9 @@ class Macro:
             #Enable rearrange buttons
             up_button.configure(state="normal")
             down_button.configure(state="normal")
+
+            #Enable del button
+            del_button.configure(state="normal")
 
         lbox.bind('<<ListboxSelect>>', item_selected)
 
