@@ -51,6 +51,7 @@ def gui_window():
             loaded_config["Profiles"]["0"]["Gestures"][gesture] = {}
             loaded_config["Profiles"]["0"]["Gestures"][gesture]["Events"] = []
             loaded_config["Profiles"]["0"]["Gestures"][gesture]["min_confidence"] = 80
+            loaded_config["Profiles"]["0"]["Gestures"][gesture]["reactivation_delay"] = 0
         with open("config.json", 'w') as file:
             json.dump(loaded_config, file, indent=4)
 
@@ -249,6 +250,7 @@ def create_profile():
         new_profile["Gestures"][gesture] = {}
         new_profile["Gestures"][gesture]["Events"] = []
         new_profile["Gestures"][gesture]["min_confidence"] = 80
+        new_profile["Gestures"][gesture]["reactivation_delay"] = 0
 
     loaded_config["Profiles"][new_index] = new_profile
     save_config()
@@ -448,6 +450,7 @@ class Macro:
     saved_macro: list["Event"] = []
     lboxvar = tk.StringVar()
     min_confidence = 80
+    reactivation_delay = 0
     recording = []
     last_event_time = 0
     active = False
@@ -544,6 +547,7 @@ class Macro:
     def load_save (self):
         self.saved_macro = []
         self.min_confidence = loaded_config["Profiles"][str(current_profile.get())]["Gestures"][self.name]["min_confidence"]
+        self.reactivation_delay = loaded_config["Profiles"][str(current_profile.get())]["Gestures"][self.name]["reactivation_delay"] = 0
         events = loaded_config["Profiles"][str(current_profile.get())]["Gestures"][self.name]["Events"]
 
         for event in events:
@@ -574,6 +578,7 @@ class Macro:
         global loaded_config
         loaded_config["Profiles"][str(current_profile.get())]["Gestures"][self.name]["Events"] = new_events
         loaded_config["Profiles"][str(current_profile.get())]["Gestures"][self.name]["min_confidence"] = self.min_confidence
+        loaded_config["Profiles"][str(current_profile.get())]["Gestures"][self.name]["reactivation_delay"] = self.reactivation_delay
 
         save_config()
 
@@ -598,7 +603,9 @@ class Macro:
                     controller.press(event.key)
                 else:
                     controller.release(event.key)
-        
+            
+            time.sleep(self.reactivation_delay)
+
             self.active = False
 
         play_thread = Thread(target=playback, daemon=True)
@@ -636,7 +643,7 @@ class Macro:
     def open_edit_window(self,x,y):
         popup = tk.Toplevel()
         popup.wm_title = "Edit Macro"
-        popup.geometry(f"400x300+{x+5}+{y+20}")
+        popup.geometry(f"400x350+{x+5}+{y+20}")
 
         #Event Listbox
         self.update_lbox()
@@ -657,9 +664,35 @@ class Macro:
         confidence_slider.set(self.min_confidence)
         confidence_slider.grid(row=0, column=1)
 
+        #Reactivation delay
+        reactivation_label = tk.Label(gesture_settings_frame, text="How many seconds after macro \nends can be activated again: ")
+        reactivation_label.grid(row=1, column=0)
+
+        def validate_entry(new_entry):
+            if not new_entry:
+                return True
+            try:
+                float(new_entry)
+                return True
+            except ValueError:
+                return False
+            
+        def reactivation_changed(event):
+            entry = event.widget.get()
+            if entry == "":
+                self.reactivation_delay = 0
+            else:
+                self.reactivation_delay = float(entry)
+            self.save()
+            
+        vcmd = popup.register(validate_entry)
+        reactivation_entry = tk.Entry(gesture_settings_frame, validate="key", validatecommand=(vcmd, "%P",), width=10)
+        reactivation_entry.grid(row=1,column=1)
+        reactivation_entry.bind("<KeyRelease>", reactivation_changed)
+
         #Record button
         record = tk.Button(gesture_settings_frame, text="Record from keyboard", command=lambda: self.open_record_window(popup.winfo_x(), popup.winfo_y()))
-        record.grid(row=1, column=0, pady=5)
+        record.grid(row=2, column=0, pady=5)
 
         gesture_settings_frame.pack()
 
@@ -702,28 +735,17 @@ class Macro:
         delay_entry_label = tk.Label(event_properties_frame, text="Seconds before \n key is activated:")
         delay_entry_label.grid(row=1,column=0)
 
-        def entry_changed(event):
+        def delay_changed(event):
             entry = event.widget.get()
             if entry == "":
-                delay_entry.insert(0,"0")
-                return
-
-            self.saved_macro[lbox.curselection()[0]].delay = float(entry)
+                self.saved_macro[lbox.curselection()[0]].delay = 0
+            else:
+                self.saved_macro[lbox.curselection()[0]].delay = float(entry)
             self.save()
-        
-        def validate_entry(new_entry):
-            if not new_entry:
-                return True
-            try:
-                float(new_entry)
-                return True
-            except ValueError:
-                return False
 
-        vcmd = event_properties_frame.register(validate_entry)
         delay_entry = tk.Entry(event_properties_frame, state="readonly", validate="key", validatecommand=(vcmd, "%P",))
         delay_entry.grid(row=1,column=1)
-        delay_entry.bind("<KeyRelease>", entry_changed)
+        delay_entry.bind("<KeyRelease>", delay_changed)
 
         #Press/release toggle
         pressed_label = tk.Label(event_properties_frame, text="Press or release key:")
