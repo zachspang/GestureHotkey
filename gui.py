@@ -124,7 +124,7 @@ def gui_window():
         gesture_icon.grid(row=index,column=0)
         
         edit_btn = tk.Button(macro_button_frame, text="Edit", command=lambda index=index: macro_list[index].open_edit_window(root.winfo_x(), root.winfo_y()))
-        edit_btn.grid(row=index,column=1)
+        edit_btn.grid(row=index,column=1, padx=35)
 
     macro_canvas.create_window((0,0), window=macro_button_frame, anchor="nw")
     macro_canvas.pack(side="left", anchor="w", expand=True, fill="y")
@@ -634,14 +634,40 @@ class Macro:
         self.lboxvar.set(new_lbox)
 
     def open_edit_window(self,x,y):
-        
         popup = tk.Toplevel()
         popup.wm_title = "Edit Macro"
-        popup.geometry(f"300x300+{x+5}+{y+20}")
+        popup.geometry(f"400x300+{x+5}+{y+20}")
 
+        #Event Listbox
         self.update_lbox()
         lbox = tk.Listbox(popup, listvariable=self.lboxvar, width=10, height=12, font="Helvetica 14 bold", selectmode=tk.SINGLE, exportselection=False)
         lbox.pack(padx=5, side="left")
+
+        gesture_settings_frame = tk.Frame(popup)
+
+        #Confidence Slider
+        confindence_label = tk.Label(gesture_settings_frame, text="Minimum Confidence:")
+        confindence_label.grid(row=0, column=0, pady=(10,0))
+
+        def min_confidence_changed(_):
+            self.min_confidence = confidence_slider.get()
+            self.save()
+
+        confidence_slider = tk.Scale(gesture_settings_frame, from_=0, to=100, orient="horizontal", command=min_confidence_changed)
+        confidence_slider.set(self.min_confidence)
+        confidence_slider.grid(row=0, column=1)
+
+        #Record button
+        record = tk.Button(gesture_settings_frame, text="Record from keyboard", command=lambda: self.open_record_window(popup.winfo_x(), popup.winfo_y()))
+        record.grid(row=1, column=0, pady=5)
+
+        gesture_settings_frame.pack()
+
+        event_settings_frame = tk.Frame(popup)
+        event_settings_label = tk.Label(event_settings_frame, text="Settings for individual key:")
+        event_settings_label.grid(row=0, column=0)
+
+        event_properties_frame = tk.Frame(event_settings_frame)
 
         #key_selection combobox that lets users change the key of an event
         all_keys = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 
@@ -665,11 +691,17 @@ class Macro:
             self.saved_macro[lbox.curselection()[0]].key = new_key
             self.save()
 
-        key_selection = ttk.Combobox(popup, values=all_keys, state="disabled")
-        key_selection.pack()
+        key_selection_label = tk.Label(event_properties_frame, text="Key to activate:")
+        key_selection_label.grid(row=0,column=0)
+
+        key_selection = ttk.Combobox(event_properties_frame, values=all_keys, state="disabled")
+        key_selection.grid(row=0, column=1)
         key_selection.bind("<<ComboboxSelected>>", key_changed)
 
         #delay_entry text box that lets users change delay of an event
+        delay_entry_label = tk.Label(event_properties_frame, text="Seconds before \n key is activated:")
+        delay_entry_label.grid(row=1,column=0)
+
         def entry_changed(event):
             entry = event.widget.get()
             if entry == "":
@@ -688,12 +720,16 @@ class Macro:
             except ValueError:
                 return False
 
-        vcmd = popup.register(validate_entry)
-        delay_entry = tk.Entry(popup, state="readonly", validate="key", validatecommand=(vcmd, "%P",))
-        delay_entry.pack()
+        vcmd = event_properties_frame.register(validate_entry)
+        delay_entry = tk.Entry(event_properties_frame, state="readonly", validate="key", validatecommand=(vcmd, "%P",))
+        delay_entry.grid(row=1,column=1)
         delay_entry.bind("<KeyRelease>", entry_changed)
 
         #Press/release toggle
+        pressed_label = tk.Label(event_properties_frame, text="Press or release key:")
+        pressed_label.grid(row=2,column=0)
+
+        pressed_frame = tk.Frame(event_properties_frame)
         pressed_var = tk.BooleanVar(value=True)
 
         def toggle_press(_var, _index, _mode):
@@ -703,10 +739,15 @@ class Macro:
 
         pressed_var.trace_add("write", toggle_press)
 
-        pressed_button = tk.Radiobutton(popup, text="Press", variable=pressed_var, value=True, state="disabled")
-        pressed_button.pack()
-        released_button = tk.Radiobutton(popup, text="Release", variable=pressed_var, value=False, state="disabled")
-        released_button.pack()
+        pressed_button = tk.Radiobutton(pressed_frame, text="Press", variable=pressed_var, value=True, state="disabled")
+        pressed_button.grid(row=0, column=0)
+        released_button = tk.Radiobutton(pressed_frame, text="Release", variable=pressed_var, value=False, state="disabled")
+        released_button.grid(row=1, column=0)
+
+        pressed_frame.grid(row=2,column=1)
+        event_properties_frame.grid(row=1, column=0)
+
+        move_button_frame = tk.Frame(event_settings_frame)
 
         #Buttons to rearrange events
         def move_up():
@@ -737,11 +778,11 @@ class Macro:
 
             self.save()
 
-        up_button = tk.Button(popup, text="^", height=1,width=3, font="Helvetica 20 bold", command=move_up, state="disabled")
-        up_button.pack(side="bottom")
+        up_button = tk.Button(move_button_frame, text="^", height=1,width=3, font="Helvetica 20 bold", command=move_up, state="disabled")
+        up_button.grid(row=0,column=2)
 
-        down_button = tk.Button(popup, text="v", height=1,width=3, font="Helvetica 20 bold", command= move_down, state="disabled")
-        down_button.pack(side="bottom")
+        down_button = tk.Button(move_button_frame, text="v", height=1,width=3, font="Helvetica 20 bold", command= move_down, state="disabled")
+        down_button.grid(row=0,column=3)
 
         #Buttons to add and delete events
         def add_event():
@@ -769,20 +810,14 @@ class Macro:
 
             self.save()
 
-        add_button = tk.Button(popup, text="+", height=1,width=3, font="Helvetica 20 bold", command=add_event, state="normal")
-        add_button.pack(side="bottom")
+        add_button = tk.Button(move_button_frame, text="+", height=1,width=3, font="Helvetica 20 bold", command=add_event, state="normal")
+        add_button.grid(row=0,column=0)
 
-        del_button = tk.Button(popup, text="-", height=1,width=3, font="Helvetica 20 bold", command=remove_event, state="disabled")
-        del_button.pack(side="bottom")
+        del_button = tk.Button(move_button_frame, text="-", height=1,width=3, font="Helvetica 20 bold", command=remove_event, state="disabled")
+        del_button.grid(row=0,column=1)
 
-        #Confidence Slider
-        def min_confidence_changed(_):
-            self.min_confidence = confidence_slider.get()
-            self.save()
-
-        confidence_slider = tk.Scale(popup, from_=0, to=100, orient="horizontal", command=min_confidence_changed)
-        confidence_slider.set(self.min_confidence)
-        confidence_slider.pack()
+        move_button_frame.grid(row=2, column=0, pady=5)
+        event_settings_frame.pack(side="bottom")
 
         def item_selected(event):
             if not event.widget.curselection() or len(self.saved_macro) == 0:
@@ -838,9 +873,6 @@ class Macro:
             del_button.configure(state="normal")
 
         lbox.bind('<<ListboxSelect>>', item_selected)
-
-        record = tk.Button(popup, text="Record", command=lambda: self.open_record_window(popup.winfo_x(), popup.winfo_y()))
-        record.pack(padx=5, side="right")
 
 #A single event, either a key being pressed or released and the about of time in seconds since the last event.
 class Event:
