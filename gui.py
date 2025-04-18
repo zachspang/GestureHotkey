@@ -20,6 +20,7 @@ current_profile_label = tk.StringVar()
 profile_select:tk.Menu
 loaded_config = {}
 macro_list = []
+popup_count = 0
 
 def gui_window():
     global root
@@ -320,8 +321,20 @@ def about_popup(x,y):
     def open_url(url):
         webbrowser.open_new_tab(url)
 
+    global popup_count
+    if popup_count > 0:
+        return
+    
+    def close_window():
+        popup.destroy()
+        global popup_count
+        popup_count -= 1
+
+    popup_count += 1
+
     popup = tk.Toplevel()
-    popup.wm_title = "About"
+    popup.protocol("WM_DELETE_WINDOW", close_window)
+    popup.title("About")
     popup.geometry(f"230x200+{x-20}+{y+20}")
 
     title = tk.Label(popup, text="GestureHotkey v0.1")
@@ -355,6 +368,9 @@ def camera_settings(x,y):
 
         detection_thread = Thread(target=detection_window, daemon=True)
         detection_thread.start()
+
+        global popup_count
+        popup_count -= 1
     
     def save_and_close():
         set_cam(combo.current())
@@ -362,8 +378,12 @@ def camera_settings(x,y):
         save_config()
         close_window()
 
-    popup.protocol("WM_DELETE_WINDOW", lambda: close_window())
-    popup.wm_title = "Select Camera"
+    global popup_count
+    if popup_count > 0:
+        return
+
+    popup.protocol("WM_DELETE_WINDOW", close_window)
+    popup.title("Select Camera")
     popup.geometry(f"300x300+{x+5}+{y+20}")
 
     options = []
@@ -522,19 +542,39 @@ class Macro:
             
             self.listener.start()
 
+        #Close the record window and stop the keyboard listener thread
+        def close_record_window (window: tk.Toplevel):
+            window.destroy()
+            self.recording = []
+
+            if self.listener:
+                self.listener.stop()
+
+            global popup_count
+            popup_count -= 1
+
+        #Save recording and close the window
+        def save_and_close (window: tk.Toplevel):
+            self.save()
+            close_record_window(window)
         #Reset recording and last_event_time incase there was a previous recording
         self.recording = []
         self.last_event_time = 0
 
-        popup = tk.Toplevel()
-        popup.wm_title = "Record Macro"
-        popup.geometry(f"300x300+{x+5}+{y+20}")
-        popup.protocol("WM_DELETE_WINDOW", lambda: self.close_window(popup))
+        global popup_count
+        if popup_count > 1:
+            return
 
-        cancel = tk.Button(popup, text="Cancel", command=lambda: self.close_window(popup))
+        popup_count += 1
+        popup = tk.Toplevel()
+        popup.title("Record Macro")
+        popup.geometry(f"300x300+{x+5}+{y+20}")
+        popup.protocol("WM_DELETE_WINDOW", lambda: close_record_window(popup))
+
+        cancel = tk.Button(popup, text="Cancel", command=lambda: close_record_window(popup))
         cancel.pack(side=tk.RIGHT, anchor="se", padx=5, pady=5)
         
-        save = tk.Button(popup, text="Save", command=lambda: self.save_and_close(popup))
+        save = tk.Button(popup, text="Save", command=lambda: save_and_close(popup))
         save.pack(side=tk.RIGHT, anchor="se", padx=5, pady=5)
 
         #Text box that shows events as they are recorded
@@ -555,11 +595,6 @@ class Macro:
                 self.saved_macro.append(Event(keyboard.HotKey.parse(event["key"])[0], event["delay"], event["pressed"]))
             except ValueError: 
                 self.saved_macro.append(Event(eval(f"keyboard.Key.{event['key']}"), event["delay"], event["pressed"]))
-
-    #Save recording and close the window
-    def save_and_close (self, window: tk.Toplevel):
-        self.save()
-        self.close_window(window)
         
     #Save the macro
     def save(self):
@@ -581,14 +616,6 @@ class Macro:
         loaded_config["Profiles"][str(current_profile.get())]["Gestures"][self.name]["reactivation_delay"] = self.reactivation_delay
 
         save_config()
-
-    #Close the window and stop the keyboard listener thread
-    def close_window (self, window: tk.Toplevel):
-        window.destroy()
-        self.recording = []
-
-        if self.listener:
-            self.listener.stop()
 
     #Start a thread to call playback
     def start_playback (self):
@@ -641,8 +668,20 @@ class Macro:
         self.lboxvar.set(new_lbox)
 
     def open_edit_window(self,x,y):
+        global popup_count
+        if popup_count > 0:
+            return
+        
+        def close_window():
+            popup.destroy()
+            global popup_count
+            popup_count -= 1
+
+        popup_count += 1
+
         popup = tk.Toplevel()
-        popup.wm_title = "Edit Macro"
+        popup.protocol("WM_DELETE_WINDOW", close_window)
+        popup.title("Edit Macro")
         popup.geometry(f"400x350+{x+5}+{y+20}")
 
         #Event Listbox
