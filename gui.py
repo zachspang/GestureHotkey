@@ -704,6 +704,41 @@ class Macro:
         released_button = tk.Radiobutton(popup, text="Release", variable=pressed_var, value=False, state="disabled")
         released_button.pack()
 
+        #Buttons to rearrange events
+        def move_up():
+            index = lbox.curselection()[0]
+            if index == 0:
+                return
+            temp = self.saved_macro[index]
+            self.saved_macro[index] = self.saved_macro[index - 1]
+            self.saved_macro[index - 1] = temp
+
+            lbox.selection_clear(0, tk.END)
+            lbox.activate(index - 1)
+            lbox.selection_set(index - 1)
+
+            self.save()
+
+        def move_down():
+            index = lbox.curselection()[0]
+            if index == len(self.saved_macro) - 1:
+                return
+            temp = self.saved_macro[index]
+            self.saved_macro[index] = self.saved_macro[index + 1]
+            self.saved_macro[index + 1] = temp
+
+            lbox.selection_clear(0, tk.END)
+            lbox.activate(index + 1)
+            lbox.selection_set(index + 1)
+
+            self.save()
+
+        up_button = tk.Button(popup, text="^", height=1,width=3, font="Helvetica 20 bold", command=move_up, state="disabled")
+        up_button.pack(side="bottom")
+
+        down_button = tk.Button(popup, text="v", height=1,width=3, font="Helvetica 20 bold", command= move_down, state="disabled")
+        down_button.pack(side="bottom")
+
         def item_selected(event):
             if not event.widget.curselection():
                 #Reset key_selection
@@ -718,6 +753,11 @@ class Macro:
                 pressed_var.set(True)
                 pressed_button.configure(state="disabled")
                 released_button.configure(state="disabled")
+
+                #Disable rearrange buttons
+                up_button.configure(state="disabled")
+                down_button.configure(state="disabled")
+
                 return
             selection = self.saved_macro[event.widget.curselection()[0]]
             
@@ -742,6 +782,10 @@ class Macro:
             pressed_button.configure(state="normal")
             released_button.configure(state="normal")
             pressed_var.set(selection.pressed)
+
+            #Enable rearrange buttons
+            up_button.configure(state="normal")
+            down_button.configure(state="normal")
 
         lbox.bind('<<ListboxSelect>>', item_selected)
 
