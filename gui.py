@@ -50,6 +50,7 @@ def gui_window():
         for gesture in gesture_list:
             loaded_config["Profiles"]["0"]["Gestures"][gesture] = {}
             loaded_config["Profiles"]["0"]["Gestures"][gesture]["Events"] = []
+            loaded_config["Profiles"]["0"]["Gestures"][gesture]["min_confidence"] = 80
         with open("config.json", 'w') as file:
             json.dump(loaded_config, file, indent=4)
 
@@ -62,6 +63,7 @@ def gui_window():
             value=0,
             command=profile_changed
         )
+        macro_list = [Macro(gesture) for gesture in gesture_list]
 
     load_profile_radiobuttons()
     set_cam(loaded_config["default_cam"])
@@ -121,7 +123,6 @@ def gui_window():
         gesture_icon = tk.Label(macro_button_frame, image=gesture_img_list[index], height=50, width=50)
         gesture_icon.grid(row=index,column=0)
         
-        #TODO: Move record to col 2 and display an edit button in col1
         edit_btn = tk.Button(macro_button_frame, text="Edit", command=lambda index=index: macro_list[index].open_edit_window(root.winfo_x(), root.winfo_y()))
         edit_btn.grid(row=index,column=1)
 
@@ -156,7 +157,7 @@ def gui_window():
                     except KeyError:
                         pass
 
-                    if detection["confidence"] > 0.8 and not macro.active:
+                    if detection["confidence"] > (macro.min_confidence / 100) and not macro.active:
                         macro.start_playback()
 
             if macro.name in waiting_to_release and not macro.active:
@@ -247,6 +248,7 @@ def create_profile():
     for gesture in gesture_list:
         new_profile["Gestures"][gesture] = {}
         new_profile["Gestures"][gesture]["Events"] = []
+        new_profile["Gestures"][gesture]["min_confidence"] = 80
 
     loaded_config["Profiles"][new_index] = new_profile
     save_config()
@@ -445,6 +447,7 @@ def camera_settings(x,y):
 class Macro:
     saved_macro: list["Event"] = []
     lboxvar = tk.StringVar()
+    min_confidence = 80
     recording = []
     last_event_time = 0
     active = False
@@ -540,6 +543,7 @@ class Macro:
 
     def load_save (self):
         self.saved_macro = []
+        self.min_confidence = loaded_config["Profiles"][str(current_profile.get())]["Gestures"][self.name]["min_confidence"]
         events = loaded_config["Profiles"][str(current_profile.get())]["Gestures"][self.name]["Events"]
 
         for event in events:
@@ -559,7 +563,6 @@ class Macro:
             self.saved_macro = self.recording
 
         self.update_lbox()
-        self.print()
         
         new_events = []
         for event in self.saved_macro:
@@ -570,6 +573,7 @@ class Macro:
 
         global loaded_config
         loaded_config["Profiles"][str(current_profile.get())]["Gestures"][self.name]["Events"] = new_events
+        loaded_config["Profiles"][str(current_profile.get())]["Gestures"][self.name]["min_confidence"] = self.min_confidence
 
         save_config()
 
@@ -770,6 +774,15 @@ class Macro:
 
         del_button = tk.Button(popup, text="-", height=1,width=3, font="Helvetica 20 bold", command=remove_event, state="disabled")
         del_button.pack(side="bottom")
+
+        #Confidence Slider
+        def min_confidence_changed(_):
+            self.min_confidence = confidence_slider.get()
+            self.save()
+
+        confidence_slider = tk.Scale(popup, from_=0, to=100, orient="horizontal", command=min_confidence_changed)
+        confidence_slider.set(self.min_confidence)
+        confidence_slider.pack()
 
         def item_selected(event):
             if not event.widget.curselection() or len(self.saved_macro) == 0:
