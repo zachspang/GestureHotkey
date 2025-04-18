@@ -690,18 +690,38 @@ class Macro:
         delay_entry.bind("<KeyRelease>", entry_changed)
 
         #Press/release toggle
+        pressed_var = tk.BooleanVar(value=True)
+
+        def toggle_press(_var, _index, _mode):
+            if self.saved_macro[lbox.curselection()[0]].pressed != pressed_var.get():
+                self.saved_macro[lbox.curselection()[0]].pressed = pressed_var.get()
+                self.save()
+
+        pressed_var.trace_add("write", toggle_press)
+
+        pressed_button = tk.Radiobutton(popup, text="Press", variable=pressed_var, value=True, state="disabled")
+        pressed_button.pack()
+        released_button = tk.Radiobutton(popup, text="Release", variable=pressed_var, value=False, state="disabled")
+        released_button.pack()
 
         def item_selected(event):
             if not event.widget.curselection():
+                #Reset key_selection
                 key_selection.current(0)
                 key_selection.configure(state="disabled")
-                #Reset delay
+
+                #Reset delay_entry
                 delay_entry.delete(0, tk.END)
                 delay_entry.configure(state="readonly")
-                #Reset pressed
+
+                #Reset press/release
+                pressed_var.set(True)
+                pressed_button.configure(state="disabled")
+                released_button.configure(state="disabled")
                 return
             selection = self.saved_macro[event.widget.curselection()[0]]
-
+            
+            #update key_selection
             keyname = str(selection.key)
             if keyname[:4] == "Key.":
                 keyname = keyname[4:]
@@ -712,11 +732,16 @@ class Macro:
 
             key_selection.configure(state="readonly")
             key_selection.current(all_keys.index(keyname))
+
             #update delay
             delay_entry.configure(state="normal")
             delay_entry.delete(0, tk.END)
             delay_entry.insert(0, round(selection.delay, 3))
+
             #update press/release
+            pressed_button.configure(state="normal")
+            released_button.configure(state="normal")
+            pressed_var.set(selection.pressed)
 
         lbox.bind('<<ListboxSelect>>', item_selected)
 
