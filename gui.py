@@ -13,7 +13,10 @@ import cv2
 from cv2_enumerate_cameras import enumerate_cameras
 from PIL import ImageTk, Image, ImageDraw, ImageFont
 
-gesture_list = ["peace", "fist", "call", "thumbs up", "thumbs down", "ok", "rock", "one", "three", "four", "palm", "stop"]
+gesture_list = ["peace", "peace_inverted", "fist", "call", "like", "dislike", "ok", "grip", "rock", 
+                "one", "thumb_index", "thumb_index2", "two_up", "two_up_inverted","three", "three2", "three3",
+                "four", "palm", "stop", "mute", "holy", "timeout", "take_picture", "little_finger"
+                ]
 root = tk.Tk()
 current_profile = tk.IntVar()
 current_profile_label = tk.StringVar()
