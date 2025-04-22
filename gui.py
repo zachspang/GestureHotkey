@@ -590,7 +590,7 @@ class Macro:
     def load_save (self):
         self.saved_macro = []
         self.min_confidence = loaded_config["Profiles"][str(current_profile.get())]["Gestures"][self.name]["min_confidence"]
-        self.reactivation_delay = loaded_config["Profiles"][str(current_profile.get())]["Gestures"][self.name]["reactivation_delay"] = 0
+        self.reactivation_delay = loaded_config["Profiles"][str(current_profile.get())]["Gestures"][self.name]["reactivation_delay"]
         events = loaded_config["Profiles"][str(current_profile.get())]["Gestures"][self.name]["Events"]
 
         for event in events:
@@ -729,6 +729,8 @@ class Macro:
             
         vcmd = popup.register(validate_entry)
         reactivation_entry = tk.Entry(gesture_settings_frame, validate="key", validatecommand=(vcmd, "%P",), width=10)
+        reactivation_entry.delete(0, tk.END)
+        reactivation_entry.insert(0, round(self.reactivation_delay, 3))
         reactivation_entry.grid(row=1,column=1)
         reactivation_entry.bind("<KeyRelease>", reactivation_changed)
 
