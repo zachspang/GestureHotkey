@@ -645,8 +645,15 @@ class Macro:
     def start_release(self):
         def release():
             controller = keyboard.Controller()
+            stuck_keys = []
             for event in self.saved_macro:
-                controller.release(event.key)
+                if event.pressed:
+                    stuck_keys.append(event.key)
+                else:
+                    stuck_keys.remove(event.key)
+            
+            for key in stuck_keys:
+                controller.release(key)
 
         release_thread = Thread(target=release, daemon=True)
         release_thread.start()
