@@ -28,7 +28,7 @@ popup_count = 0
 def gui_window():
     global root
     root.title("GestureHotkey")
-    root.geometry("200x300")
+    root.geometry("250x450")
 
     menubar = tk.Menu()
 
@@ -107,8 +107,8 @@ def gui_window():
     gesture_label = tk.Label(label_frame, text="Gesture", font="Helvetica 10 bold")
     gesture_label.grid(row=1,column=0, sticky="w")
 
-    macro_label = tk.Label(label_frame, text="Macro", font="Helvetica 10 bold")
-    macro_label.grid(row=1,column=1, sticky="w")
+    macro_label = tk.Label(label_frame, text="     Macro", font="Helvetica 10 bold")
+    macro_label.grid(row=1,column=1)
 
     #binding_frame holds the labels and macro_canvas_frame which holds macro_canvas. macro_canvas has a scrollbar and holds macro_button_frame
     macro_canvas_frame = tk.Frame(binding_frame)
@@ -692,7 +692,7 @@ class Macro:
         popup = tk.Toplevel()
         popup.protocol("WM_DELETE_WINDOW", close_window)
         popup.title("Edit Macro")
-        popup.geometry(f"400x350+{x+5}+{y+20}")
+        popup.geometry(f"430x350+{x+5}+{y+20}")
 
         #Event Listbox
         self.update_lbox()
