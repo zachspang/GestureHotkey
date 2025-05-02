@@ -163,7 +163,8 @@ def gui_window():
                         pass
 
                     if detection["confidence"] > (macro.min_confidence / 100) and not macro.active:
-                        macro.start_playback()
+                        if time.time() - macro.last_playback_time > macro.reactivation_delay:
+                            macro.start_playback()
 
             if macro.name in waiting_to_release and not macro.active:
                 macro.start_release()
@@ -475,6 +476,7 @@ class Macro:
     min_confidence = 80
     reactivation_delay = 0
     recording = []
+    last_playback_time = 0
     last_event_time = 0
     active = False
     listener: keyboard.Listener = None
@@ -634,7 +636,7 @@ class Macro:
                 else:
                     controller.release(event.key)
             
-            time.sleep(self.reactivation_delay)
+            self.last_playback_time = time.time()
 
             self.active = False
 
